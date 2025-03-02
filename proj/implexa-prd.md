@@ -1,7 +1,7 @@
-# Git-Based PLM/PDM Solution: Product Requirements Document
+# Implexa: Git-Based PLM/PDM Solution - Product Requirements Document
 
 ## Executive Summary
-This document outlines requirements for a hardware-focused Product Lifecycle Management (PLM) and Product Data Management (PDM) solution that leverages Git for version control while remaining CAD-agnostic. The system aims to bridge the gap between software engineering practices and hardware design workflows, enabling efficient management of design files across multiple CAD platforms, with specific focus on KiCad integration.
+This document outlines requirements for Implexa, a hardware-focused Product Lifecycle Management (PLM) and Product Data Management (PDM) solution that leverages Git for version control while remaining CAD-agnostic. Built with Tauri and Rust, Implexa aims to bridge the gap between software engineering practices and hardware design workflows, enabling efficient management of design and manufacturing files across multiple CAD platforms, with an initial focus on KiCad integration.
 
 ## Problem Statement
 Current PLM/PDM solutions fall into two problematic categories:
@@ -38,7 +38,7 @@ Engineers need a solution that works with raw files from any CAD tool while prov
 - **Status Tracking**: Record part status (Draft, In Review, Released, Obsolete)
 
 ### 5. User Interface
-- **Electron + Web Application**: Local tool with embedded web server
+- **Tauri + Web Frontend**: Local tool with secure, memory-safe backend
 - **Deployable Mode**: Same codebase deployable for team access
 - **Visual Relationship Mapping**: Show dependencies between components and designs
 - **Git Authentication**: Leverage existing Git permissions model
@@ -49,14 +49,23 @@ Engineers need a solution that works with raw files from any CAD tool while prov
 - **Metadata Tags**: Flexible tagging system for detailed categorization
 - **Search-First Design**: Powerful search capabilities across metadata
 
-## High-Level Architecture
+## Architecture & Technology Stack
+
+### Technology Stack
+- **Frontend**: Web technologies (HTML, CSS, TypeScript)
+- **Frontend Framework**: React with modern state management
+- **UI Framework**: TailwindCSS for styling
+- **Backend**: Rust for performance, safety, and reliability
+- **Application Framework**: Tauri for cross-platform desktop applications
+- **Database**: SQLite (via rusqlite) for metadata storage
+- **Version Control**: Git (via git2-rs or process invocation)
 
 ```
 ┌─────────────────────────────────────────────────────┐
 │                  User Interface                      │
 │                                                     │
 │  ┌─────────────────────────────────────────────┐    │
-│  │ Electron Application with Embedded Web Server│    │
+│  │    Tauri with Platform Native Webview       │    │
 │  └─────────────────────────────────────────────┘    │
 └───────────────────────┬─────────────────────────────┘
                         │
@@ -96,13 +105,13 @@ Engineers need a solution that works with raw files from any CAD tool while prov
 ## Key Components
 
 ### 1. Git Backend Manager
-Manages interaction with Git repositories, handling commits, branches, and merges while preserving PLM metadata. Implements Git-LFS for binary files and configures sparse checkout for efficient handling of large repositories.
+Manages interaction with Git repositories, handling commits, branches, and merges while preserving PLM metadata. Implements Git-LFS for binary files and configures sparse checkout for efficient handling of large repositories. Implemented in Rust for reliability and performance.
 
 ### 2. Metadata Manager
-Uses SQLite database to store and maintain PLM-specific metadata (approvals, revisions, part properties) with each part directory. Manages relationships between parts and enforces data integrity.
+Uses SQLite database to store and maintain PLM-specific metadata (approvals, revisions, part properties) with each part directory. Manages relationships between parts and enforces data integrity. Takes advantage of Rust's strong typing and error handling.
 
 ### 3. CAD File Parsers
-Plugins to extract information from various CAD file formats, prioritizing open formats (KiCad, FreeCAD, STEP) with graceful degradation for proprietary formats. Extracts BOMs, dimensions, and other critical metadata.
+Plugins to extract information from various CAD file formats, prioritizing open formats (KiCad, FreeCAD, STEP) with graceful degradation for proprietary formats. Extracts BOMs, dimensions, and other critical metadata. Memory-safe parsing in Rust prevents common security vulnerabilities.
 
 ### 4. Workflow Engine
 Defines and enforces workflows for design changes, reviews, and releases using Git branch strategies and approval gates. Manages part status transitions and approval processes.
@@ -118,7 +127,7 @@ Specialized visualization tools for comparing:
 Organizes parts in a unified structure where every component (from resistors to complete products) follows the same organization pattern with appropriate metadata and relationships.
 
 ### 7. User Interface
-Electron application with embedded web server providing local file access and Git integration, with optional deployment mode for team access.
+Tauri application with React frontend, providing local file access and Git integration, with optional deployment mode for team access. Optimized for performance with a small resource footprint.
 
 ## KiCad Integration
 
@@ -141,7 +150,7 @@ Electron application with embedded web server providing local file access and Gi
 ## Implementation Approach
 
 ### Phase 1: Core Infrastructure (MVP)
-- Implement Git backend with basic metadata storage
+- Implement Git backend manager in Rust
 - Create SQLite database schema for part information
 - Implement part creation and basic status workflow
 - Develop manual metadata entry interface
@@ -242,3 +251,66 @@ The system will interface with:
 - CI/CD pipelines for validation
 - KiCad via ODBC connection
 - Optional integrations with supplier databases
+
+## Tauri-Specific Advantages (ie Why did we pick Tauri over Electron?)
+
+### 1. Security
+- Granular permissions model with least-privilege access
+- Memory safety from Rust preventing common vulnerabilities
+- Reduced attack surface compared to Electron
+
+### 2. Performance
+- Smaller application size (typically 10-20x smaller than Electron)
+- Lower memory usage for long-running sessions
+- Faster startup and response times
+
+### 3. Cross-Platform Consistency
+- Platform-specific optimizations while maintaining core functionality
+- Native OS integration with smaller footprint
+- Better accessibility support through native controls
+
+### 4. Development Experience
+- Type safety across entire stack
+- Robust error handling in backend code
+- Better serialization/deserialization with strong typing
+
+### 5. The devs wanted to learn some rust
+- :)
+
+## Development Environment Setup
+
+To set up the development environment:
+
+```bash
+# Install Rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Install Node.js dependencies
+npm install
+
+# Start development mode
+npm run tauri dev
+```
+
+## Building the Application
+
+To build the application for distribution:
+
+```bash
+# Build for all platforms
+npm run tauri build
+
+# Build for specific platform
+npm run tauri build -- --target [platform]
+```
+
+## Testing Strategy
+
+1. **Unit Tests**: Test individual Rust functions and React components
+2. **Integration Tests**: Test interaction between frontend and Rust backend
+3. **UI Tests**: Test component rendering and user interactions
+4. **End-to-End Tests**: Test complete workflows from UI to filesystem
+
+## Conclusion
+
+Implexa represents a modern approach to PLM/PDM for hardware developers, combining Git-based version control with a structured metadata system. Built with Tauri and Rust, it offers superior performance, security, and reliability compared to traditional PLM systems, while maintaining a user-friendly interface that integrates naturally with hardware development workflows.

@@ -1,0 +1,2 @@
+About the Name
+Implexa comes from the Latin word "implex," meaning "interweaving" or "entanglement." We chose this name because it reflects how our system helps manage the complex, interconnected relationships in hardware product development—parts, assemblies, revisions, alternates, variants, and ECNs all woven together into a coherent system. And as a little bonus it has the letters P, L, and M in it as well!

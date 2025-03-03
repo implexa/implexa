@@ -17,7 +17,7 @@ This document tracks key architectural decisions made during the development of 
 
 ### DEC-010 - Rust Module Organization Pattern
 - **Date:** 2025-03-03
-- **Status:** Proposed
+- **Status:** Implemented
 - **Context:** The project currently uses the mod.rs pattern for organizing Rust modules (e.g., src/git_backend/conflict/mod.rs). There was a discussion about potentially switching to the newer filename-as-module pattern (e.g., src/git_backend/conflict.rs) while the project is still young.
 - **Decision:** Switch from the mod.rs pattern to the filename-as-module pattern for all Rust modules in the project.
 - **Alternatives:**
@@ -38,7 +38,7 @@ This document tracks key architectural decisions made during the development of 
     - Requires a one-time refactoring effort to rename and move files
     - Less visual indication in file explorers that a directory is a module
     - May require more explicit pub mod declarations for submodules
-- **References:** Rust style guide recommendations, project discussion
+- **References:** Rust style guide recommendations, project discussion, memory-bank/rust-module-refactoring-guide.md, src/git_backend.rs
 
 ### DEC-001 - Use of Tauri over Electron
 - **Date:** 2025-03-02 (Documented retroactively)

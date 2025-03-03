@@ -34,10 +34,11 @@ Phase 1 (Core Infrastructure): Git backend, metadata storage, basic UI
 - State management is handled with React Context API and custom hooks
 - The UI is organized into pages, layouts, and shared components
 - Tauri Commands API is used for backend integration
-- The directory structure is standardized across all parts and libraries
+- The directory structure is configurable with minimal, standard, and extended templates
 - Git-LFS is used for binary files and large assets
 - Each part has a consistent directory structure with design, manufacturing, documentation, and tests
-- The library structure supports symbols, footprints, 3D models, and components
+- The library structure supports multiple CAD tools with separate directories (kicad-library, etc.)
+- Users can select which directories they need to avoid empty directories
 
 ## Open Questions
 - Current progress on Phase 1 implementation

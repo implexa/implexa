@@ -1,0 +1,1 @@
+- Should we use GUIDs for most of the sql IDs? (except part number)?

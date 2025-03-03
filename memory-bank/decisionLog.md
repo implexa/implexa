@@ -140,19 +140,22 @@ This document tracks key architectural decisions made during the development of 
 - **Date:** 2025-03-02
 - **Status:** Accepted
 - **Context:** The project needed a standardized directory structure for organizing files and directories within the system, both at the repository level and within individual part directories.
-- **Decision:** Implement a hierarchical directory structure with standardized organization for parts, libraries, templates, scripts, and configuration, using consistent naming conventions and Git integration.
+- **Decision:** Implement a configurable directory structure system with minimal, standard, and extended templates that users can select from, while maintaining consistent naming conventions and Git integration.
 - **Alternatives:**
+  - Fixed hierarchical structure: More consistent but potentially creates many empty directories
   - Flat structure: Simpler but less organized and harder to navigate
   - Database-driven structure: More flexible but less Git-friendly
   - CAD tool-specific structure: Better integration with specific CAD tools but less consistent across tools
   - Completely custom structure per part: Maximum flexibility but lacks consistency
 - **Consequences:**
+  - Positive: Configurable approach avoids empty directories while providing guidance
   - Positive: Consistent organization across all parts and libraries
   - Positive: Clear separation of design, manufacturing, documentation, and test files
   - Positive: Good integration with Git and Git-LFS
   - Positive: Support for multiple CAD tools while maintaining consistency
   - Positive: Standardized naming conventions improve discoverability
-  - Negative: May be overly rigid for some specialized part types
+  - Positive: Allows for future expansion with new CAD tool libraries
+  - Negative: Configuration adds complexity to implementation
   - Negative: Requires discipline to maintain consistency
-  - Negative: Deep directory hierarchies can be cumbersome to navigate
+  - Negative: May still require customization for specialized part types
 - **References:** directory-structure.md

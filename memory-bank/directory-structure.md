@@ -2,13 +2,13 @@
 
 ## Overview
 
-The directory structure for Implexa defines how files and directories are organized within the system, both at the repository level and within individual part directories. This document outlines the standardized directory structure, naming conventions, and organization patterns that ensure consistency and maintainability across the project.
+The directory structure for Implexa defines how files and directories are organized within the system, both at the repository level and within individual part directories. This document outlines the standardized directory structure, naming conventions, and organization patterns that ensure consistency and maintainability across the project, while allowing for flexibility and customization.
 
 ## Core Principles
 
-1. **Consistency**: Maintain a consistent structure across all parts and repositories
-2. **Discoverability**: Make it easy to find files and understand their purpose
-3. **Separation of Concerns**: Keep different types of files organized by their purpose
+1. **Simplicity**: Keep the directory structure simple and avoid unnecessary complexity
+2. **Configurability**: Allow users to customize the directory structure based on their needs
+3. **Discoverability**: Make it easy to find files and understand their purpose
 4. **Git-Friendly**: Optimize for Git operations and minimize conflicts
 5. **CAD-Agnostic**: Support multiple CAD tools while maintaining consistency
 
@@ -20,20 +20,35 @@ The top-level repository structure organizes the entire PLM system:
 /
 ├── parts/                  # All part data
 │   ├── [Category]-[Subcategory]-[Number]/  # Individual part directories
-│   └── library/            # Shared library components
+│   └── libraries/          # Shared library components
 ├── templates/              # Templates for new parts and other entities
 ├── scripts/                # Utility scripts and tools
 ├── config/                 # Configuration files
 │   ├── workflows/          # Workflow definitions
 │   ├── categories/         # Category and subcategory definitions
+│   ├── directory-templates/# Configurable directory templates
 │   └── settings/           # Application settings
 ├── .git/                   # Git repository data
 └── .gitattributes          # Git attributes for LFS and line endings
 ```
 
+## Configurable Directory Templates
+
+The `config/directory-templates/` directory contains configurable templates for different directory structures:
+
+```
+/config/directory-templates/
+├── minimal.json            # Minimal directory structure
+├── standard.json           # Standard directory structure (default)
+├── extended.json           # Extended directory structure with all possible directories
+└── custom/                 # User-defined custom templates
+```
+
+Users can select which template to use when creating new parts, or create their own custom templates. This approach allows users to avoid empty directories while still providing guidance on best practices.
+
 ## Part Directory Structure
 
-Each part has a standardized directory structure:
+Each part has a standardized directory structure, which can be configured based on the selected template. The following represents the extended structure with all possible directories:
 
 ```
 /parts/[Category]-[Subcategory]-[Number]/  # Part number (e.g., EL-PCB-10001)
@@ -138,23 +153,18 @@ The `tests` directory contains all test-related files:
 
 ## Library Structure
 
-The `library` directory contains shared components that can be used across multiple parts:
+The `libraries` directory contains shared components that can be used across multiple parts, with separate directories for different CAD tools:
 
 ```
-/parts/library/
-├── kicad_library.sqlite    # KiCad parts database
-├── symbols/                # Symbol libraries
-│   ├── EL-SYM-[Number]/    # Individual symbol directories
-│   └── [library files]     # Library files
-├── footprints/             # Footprint libraries
-│   ├── EL-FPR-[Number]/    # Individual footprint directories
-│   └── [library files]     # Library files
-├── 3dmodels/               # 3D model libraries
-│   ├── EL-3DM-[Number]/    # Individual 3D model directories
-│   └── [library files]     # Library files
-└── components/             # Component libraries
-    ├── EL-[Subcategory]-[Number]/  # Individual component directories
-    └── [library files]     # Library files
+/parts/libraries/
+├── kicad-library/          # KiCad library
+│   ├── kicad-library.sqlite # KiCad parts database
+│   ├── symbols/            # Symbol libraries
+│   ├── footprints/         # Footprint libraries
+│   └── 3dmodels/           # 3D model libraries
+├── freecad-library/        # FreeCAD library
+└── common-library/         # CAD-agnostic library
+    └── components/         # Component libraries
 ```
 
 ### Symbol Directory Structure
@@ -162,7 +172,7 @@ The `library` directory contains shared components that can be used across multi
 Each symbol has a standardized directory structure:
 
 ```
-/parts/library/symbols/EL-SYM-[Number]/
+/parts/libraries/kicad-library/symbols/EL-SYM-[Number]/
 ├── metadata.db             # SQLite database with symbol metadata
 ├── README.md               # Human-readable symbol description
 └── design/                 # Symbol design files
@@ -175,7 +185,7 @@ Each symbol has a standardized directory structure:
 Each footprint has a standardized directory structure:
 
 ```
-/parts/library/footprints/EL-FPR-[Number]/
+/parts/libraries/kicad-library/footprints/EL-FPR-[Number]/
 ├── metadata.db             # SQLite database with footprint metadata
 ├── README.md               # Human-readable footprint description
 └── design/                 # Footprint design files
@@ -188,7 +198,7 @@ Each footprint has a standardized directory structure:
 Each 3D model has a standardized directory structure:
 
 ```
-/parts/library/3dmodels/EL-3DM-[Number]/
+/parts/libraries/kicad-library/3dmodels/EL-3DM-[Number]/
 ├── metadata.db             # SQLite database with 3D model metadata
 ├── README.md               # Human-readable 3D model description
 └── design/                 # 3D model design files
@@ -203,7 +213,7 @@ Each 3D model has a standardized directory structure:
 Each component has a standardized directory structure:
 
 ```
-/parts/library/components/EL-[Subcategory]-[Number]/
+/parts/libraries/common-library/components/EL-[Subcategory]-[Number]/
 ├── metadata.db             # SQLite database with component metadata
 ├── README.md               # Human-readable component description
 ├── symbol/                 # Symbol reference
@@ -269,6 +279,10 @@ The `config` directory contains configuration files:
 ├── categories/             # Category and subcategory definitions
 │   ├── categories.json     # Category definitions
 │   └── subcategories.json  # Subcategory definitions
+├── directory-templates/    # Directory templates
+│   ├── minimal.json        # Minimal directory structure
+│   ├── standard.json       # Standard directory structure
+│   └── extended.json       # Extended directory structure
 └── settings/               # Application settings
     ├── app.json            # Application settings
     ├── git.json            # Git settings
@@ -427,12 +441,12 @@ The directory structure will be implemented in phases:
 3. Set up Git attributes and ignore files
 4. Create basic templates for new parts
 
-### Phase 2: Library Structure
+### Phase 2: Configurability
 
-1. Implement the library directory structure
-2. Set up symbol, footprint, and 3D model directories
-3. Create templates for library components
-4. Implement the component directory structure
+1. Implement the directory template system
+2. Create minimal, standard, and extended templates
+3. Add support for custom templates
+4. Implement the library directory structure
 
 ### Phase 3: Advanced Features
 
@@ -443,4 +457,4 @@ The directory structure will be implemented in phases:
 
 ## Conclusion
 
-The directory structure for Implexa provides a standardized, consistent, and maintainable organization for all files and directories in the system. It is designed to work well with Git, support multiple CAD tools, and integrate with the SQLite database. The structure is flexible enough to accommodate different types of parts and workflows while maintaining consistency across the project.
+The directory structure for Implexa provides a standardized, consistent, and maintainable organization for all files and directories in the system, while allowing for flexibility and customization. The configurable template approach allows users to select the level of complexity that suits their needs, avoiding the problem of empty directories while still providing guidance on best practices. The structure is designed to work well with Git, support multiple CAD tools, and integrate with the SQLite database.

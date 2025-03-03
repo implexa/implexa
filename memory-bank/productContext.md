@@ -1,4 +1,4 @@
-# Implexa: Git-Based PLM/PDM Solution - Project Brief
+# Implexa: Product Context
 
 ## Project Overview
 Implexa is a hardware-focused Product Lifecycle Management (PLM) and Product Data Management (PDM) solution that leverages Git for version control while remaining CAD-agnostic. Built with Tauri and Rust, it bridges the gap between software engineering practices and hardware design workflows, enabling efficient management of design files across multiple CAD platforms.
@@ -11,7 +11,6 @@ Current PLM/PDM solutions fall into two problematic categories:
 Engineers need a solution that works with raw files from any CAD tool while providing structured PLM/PDM capabilities integrated with modern Git-based workflows.
 
 ## Key Features
-
 - **Git-Based Version Control**: Use Git for tracking all design files and metadata
 - **CAD-Agnostic**: Work with multiple CAD tools, with special focus on KiCad integration
 - **Unified Part Library Management**: Consistent structure for all components
@@ -34,18 +33,38 @@ The project is being implemented in phases:
 3. **Phase 3 (Release Management)**: Workflow automation, manufacturing outputs
 4. **Phase 4 (Advanced Features)**: Visual relationship mapping, search, diff tools
 
-## Current Status
-Implementation of Phase 1 is underway, focusing on establishing the core components:
-- Git backend manager for repository operations
-- SQLite database schema for part information
-- Part management logic for creation and tracking
-- Core UI components using Tauri and React
+## Key Components
+1. **Git Backend Manager**: Manages interaction with Git repositories
+2. **Metadata Manager**: Uses SQLite database to store and maintain PLM-specific metadata
+3. **CAD File Parsers**: Plugins to extract information from various CAD file formats
+4. **Workflow Engine**: Defines and enforces workflows for design changes, reviews, and releases
+5. **Diff Tools**: Specialized visualization tools for comparing different file types
+6. **Part Library Management**: Organizes parts in a unified structure
+7. **User Interface**: Tauri application with React frontend
 
-## Next Steps
-- Complete Phase 1 implementation
-- Set up automated testing and CI/CD pipelines
-- Begin work on KiCad integration for Phase 2
-- Gather user feedback on initial release
+## Part Numbering Strategy
+The system uses an enhanced hybrid numbering approach:
+```
+[Category]-[Subcategory]-[Sequential Number]
+```
 
-## More info
-- Check /proj/implexa-prd.md for the project requirements doc
+## Data Storage Model
+Each part has a standardized directory structure:
+```
+/parts/
+  /[Category]-[Subcategory]-[Number]/  # Part number
+    design/                # Design files
+    manufacturing/         # Output files
+    documentation/         # Documentation
+    metadata.db            # SQLite metadata
+```
+
+## Memory Bank Structure
+This Memory Bank contains the following core files:
+- **productContext.md**: This file - Project overview and high-level design
+- **activeContext.md**: Tracks the current session's context and focus
+- **progress.md**: Tracks progress and manages tasks
+- **decisionLog.md**: Logs architectural decisions and their rationale
+
+## Project Name Origin
+Implexa comes from the Latin word "implex," meaning "interweaving" or "entanglement." The name reflects how the system helps manage the complex, interconnected relationships in hardware product development—parts, assemblies, revisions, alternates, variants, and ECNs all woven together into a coherent system. As a bonus, it contains the letters P, L, and M.

@@ -1,2 +1,2 @@
-# implexa
-A simple git based PLM and PDM for engineers by engineers
+# Implexa
+A hardware-focused git based Product Lifecycle Management for engineers by engineers.

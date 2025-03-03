@@ -15,6 +15,31 @@ This document tracks key architectural decisions made during the development of 
 
 ## Decisions
 
+### DEC-010 - Rust Module Organization Pattern
+- **Date:** 2025-03-03
+- **Status:** Proposed
+- **Context:** The project currently uses the mod.rs pattern for organizing Rust modules (e.g., src/git_backend/conflict/mod.rs). There was a discussion about potentially switching to the newer filename-as-module pattern (e.g., src/git_backend/conflict.rs) while the project is still young.
+- **Decision:** Switch from the mod.rs pattern to the filename-as-module pattern for all Rust modules in the project.
+- **Alternatives:**
+  - **mod.rs pattern (current):**
+    - Each module is a directory with a mod.rs file inside it
+    - Example: src/git_backend/conflict/mod.rs
+  - **filename-as-module pattern (newer):**
+    - Each module is a file named after the module
+    - Example: src/git_backend/conflict.rs
+- **Consequences:**
+  - **Positive:**
+    - Flatter directory structure that's easier to navigate
+    - Unique filenames make navigation and tab management easier in editors
+    - Aligns with current Rust community best practices and style guide recommendations
+    - Makes future refactoring easier (moving and renaming modules)
+    - Improves developer experience, especially for those familiar with modern Rust codebases
+  - **Negative:**
+    - Requires a one-time refactoring effort to rename and move files
+    - Less visual indication in file explorers that a directory is a module
+    - May require more explicit pub mod declarations for submodules
+- **References:** Rust style guide recommendations, project discussion
+
 ### DEC-001 - Use of Tauri over Electron
 - **Date:** 2025-03-02 (Documented retroactively)
 - **Status:** Accepted
@@ -159,3 +184,25 @@ This document tracks key architectural decisions made during the development of 
   - Negative: Requires discipline to maintain consistency
   - Negative: May still require customization for specialized part types
 - **References:** directory-structure.md
+
+### DEC-009 - Git Backend Manager Implementation
+- **Date:** 2025-03-03
+- **Status:** Accepted
+- **Context:** Following the architectural design of the Git Backend Manager, we needed to implement the component in Rust with a focus on modularity, error handling, and integration with other components.
+- **Decision:** Implement the Git Backend Manager using git2-rs (libgit2 bindings) with a modular structure consisting of six subcomponents, comprehensive error handling, and a high-level API that abstracts Git operations for PLM use.
+- **Alternatives:**
+  - Shell out to Git CLI: More familiar but less performant and harder to handle errors
+  - Pure Rust Git implementation: More control but significant development effort
+  - JavaScript/TypeScript implementation with NodeGit: Easier frontend integration but less performant
+  - Simplified implementation with fewer modules: Quicker to implement but less maintainable
+- **Consequences:**
+  - Positive: Strong typing and comprehensive error handling through Rust's type system
+  - Positive: Modular design allows for easier testing and maintenance
+  - Positive: Git-LFS support for binary files essential for hardware design
+  - Positive: Hook system enables workflow automation and metadata preservation
+  - Positive: Conflict resolution strategies tailored for PLM data
+  - Positive: Authentication provider supports multiple authentication methods
+  - Negative: Dependency on git2-rs and libgit2 versions
+  - Negative: More complex implementation compared to simpler approaches
+  - Negative: Some operations require shell commands due to git2-rs limitations
+- **References:** git-backend-architecture.md, src/git_backend/mod.rs

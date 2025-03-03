@@ -78,3 +78,7 @@ lerna-debug.log*
 callgrind.out.*
 perf.data*
 flamegraph.svg
+
+# Added by cargo
+
+/target

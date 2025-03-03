@@ -1,0 +1,80 @@
+# Rust
+/target/
+**/*.rs.bk
+/src-tauri/target/
+/src-tauri/WixTools
+
+# Node.js
+/node_modules/
+/.pnp
+.pnp.js
+
+# Build outputs
+/dist/
+/build/
+/out/
+/.output/
+/dist-electron/
+
+# Environment variables
+.env
+.env*.local
+
+# TypeScript
+*.tsbuildinfo
+
+# Testing
+/coverage/
+
+# Editor directories and files
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS specific
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# SQLite
+*.sqlite
+*.sqlite3
+*.db
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+.tauri/
+
+# Git LFS
+.git/lfs/
+
+# Tauri build artifacts
+/src-tauri/gen/
+/src-tauri/binaries/
+
+# Rust profiling
+callgrind.out.*
+perf.data*
+flamegraph.svg

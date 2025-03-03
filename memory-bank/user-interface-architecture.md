@@ -1,5 +1,7 @@
 # User Interface Architecture
 
+**Navigation:** [productContext](./productContext.md) | [activeContext](./activeContext.md) | [progress](./progress.md) | [decisionLog](./decisionLog.md) | [Memory Bank Index](./memory-bank-index.md)
+
 ## Overview
 
 The User Interface (UI) architecture for Implexa defines the structure, patterns, and components that make up the frontend of the application. Built with Tauri, React, TypeScript, and TailwindCSS, the UI provides a modern, responsive, and intuitive interface for managing hardware product lifecycle data.
@@ -473,3 +475,26 @@ The UI will be implemented in phases:
 ## Conclusion
 
 The User Interface Architecture for Implexa provides a modern, responsive, and intuitive interface for managing hardware product lifecycle data. Built with Tauri, React, TypeScript, and TailwindCSS, it leverages the best of web technologies while providing a native-like experience. The modular component structure, clear state management approach, and integration with the Rust backend ensure a maintainable and extensible UI that can evolve with the needs of the project.
+
+## Related Files
+- [Product Context](./productContext.md) - Project overview and high-level design
+- [Active Context](./activeContext.md) - Current session focus and recent activities
+- [Decision Log](./decisionLog.md) - Key architectural decisions
+- [Git Backend Architecture](./git-backend-architecture.md) - Git backend component design
+- [Database Schema Design](./database-schema-design.md) - SQLite database schema design
+- [Part Management Workflow](./part-management-workflow.md) - Part lifecycle workflow design
+- [Coding Standards](./coding-standards.md) - Code style and practices
+
+## Related Decisions
+- [DEC-007](./decisionLog.md#dec-007---user-interface-architecture) - User Interface Architecture
+- [DEC-001](./decisionLog.md#dec-001---use-of-tauri-over-electron) - Use of Tauri over Electron
+
+## Implementation
+This architecture will be implemented in the following files (not yet created):
+- `/src/ui/` - Main UI directory
+- `/src/ui/components/` - Shared components
+- `/src/ui/pages/` - Page components
+- `/src/ui/layouts/` - Layout components
+- `/src/ui/hooks/` - Custom React hooks
+- `/src/ui/context/` - React Context providers
+- `/src/ui/services/` - Service layer for backend communication

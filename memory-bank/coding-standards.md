@@ -1,5 +1,7 @@
 # Implexa: Coding Standards
 
+**Navigation:** [productContext](./productContext.md) | [activeContext](./activeContext.md) | [progress](./progress.md) | [decisionLog](./decisionLog.md) | [Memory Bank Index](./memory-bank-index.md)
+
 This document outlines the coding standards and style guidelines for the Implexa project. Following these standards ensures consistency across the codebase and makes it easier for developers to understand and maintain the code.
 
 ## Rust Coding Standards
@@ -181,3 +183,15 @@ mod tests {
 These coding standards are designed to ensure consistency and maintainability across the Implexa codebase. They should be followed for all new code and applied to existing code during refactoring.
 
 The standards may evolve over time as the project grows and as best practices in the industry change. Significant changes to these standards should be documented in the Decision Log.
+
+## Related Files
+- [Product Context](./productContext.md) - Project overview and high-level design
+- [Decision Log](./decisionLog.md) - Key architectural decisions
+- [Rust Module Refactoring Guide](./rust-module-refactoring-guide.md) - Guide for module organization
+- [Unit Testing Approach](./unit-testing-approach.md) - Testing philosophy and practices
+- [Git Backend Architecture](./git-backend-architecture.md) - Git backend component design
+- [Database Schema Design](./database-schema-design.md) - SQLite database schema design
+- [User Interface Architecture](./user-interface-architecture.md) - UI design and components
+
+## Related Decisions
+- [DEC-010](./decisionLog.md#dec-010---rust-module-organization-pattern) - Rust Module Organization Pattern

@@ -1,5 +1,7 @@
 # Implexa: Git-Based PLM/PDM Solution - Product Requirements Document
 
+**Navigation:** [productContext](./productContext.md) | [activeContext](./activeContext.md) | [progress](./progress.md) | [decisionLog](./decisionLog.md) | [Memory Bank Index](./memory-bank-index.md)
+
 ## Executive Summary
 This document outlines requirements for Implexa, a hardware-focused Product Lifecycle Management (PLM) and Product Data Management (PDM) solution that leverages Git for version control while remaining CAD-agnostic. Built with Tauri and Rust, Implexa aims to bridge the gap between software engineering practices and hardware design workflows, enabling efficient management of design and manufacturing files across multiple CAD platforms, with an initial focus on KiCad integration.
 
@@ -204,10 +206,10 @@ The system will use an enhanced hybrid numbering approach combining category and
 - **PCA**: Printed circuit assemblies
 
 Example part numbers:
-- `EL-SYM-10001`: Electronic schematic symbol
-- `EL-RES-10042`: Resistor component
-- `EL-PCB-10103`: PCB design
-- `ME-3DM-10054`: Mechanical 3D model
+- `EL-SYM-100001`: Electronic schematic symbol
+- `EL-RES-100042`: Resistor component
+- `EL-PCB-100103`: PCB design
+- `ME-3DM-100054`: Mechanical 3D model
 
 The sequential number will be the primary key in the database, with the category and subcategory codes as metadata. This approach balances human readability with system flexibility.
 
@@ -314,3 +316,17 @@ npm run tauri build -- --target [platform]
 ## Conclusion
 
 Implexa represents a modern approach to PLM/PDM for hardware developers, combining Git-based version control with a structured metadata system. Built with Tauri and Rust, it offers superior performance, security, and reliability compared to traditional PLM systems, while maintaining a user-friendly interface that integrates naturally with hardware development workflows.
+
+## Related Files
+- [Product Context](./productContext.md) - Project overview and high-level design
+- [Active Context](./activeContext.md) - Current session focus and recent activities
+- [Progress Tracking](./progress.md) - Project status and task list
+- [Decision Log](./decisionLog.md) - Key architectural decisions
+- [Git Backend Architecture](./git-backend-architecture.md) - Git backend component design
+- [Database Schema Design](./database-schema-design.md) - SQLite database schema design
+- [Part Management Workflow](./part-management-workflow.md) - Part lifecycle workflow design
+- [User Interface Architecture](./user-interface-architecture.md) - UI design and components
+- [Directory Structure](./directory-structure.md) - File and directory organization
+
+## External References
+- [projectBrief.md](../projectBrief.md) - Initial project brief in the root directory

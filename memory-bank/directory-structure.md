@@ -1,5 +1,7 @@
 # Directory Structure
 
+**Navigation:** [productContext](./productContext.md) | [activeContext](./activeContext.md) | [progress](./progress.md) | [decisionLog](./decisionLog.md) | [Memory Bank Index](./memory-bank-index.md)
+
 ## Overview
 
 The directory structure for Implexa defines how files and directories are organized within the system, both at the repository level and within individual part directories. This document outlines the standardized directory structure, naming conventions, and organization patterns that ensure consistency and maintainability across the project, while allowing for flexibility and customization.
@@ -458,3 +460,22 @@ The directory structure will be implemented in phases:
 ## Conclusion
 
 The directory structure for Implexa provides a standardized, consistent, and maintainable organization for all files and directories in the system, while allowing for flexibility and customization. The configurable template approach allows users to select the level of complexity that suits their needs, avoiding the problem of empty directories while still providing guidance on best practices. The structure is designed to work well with Git, support multiple CAD tools, and integrate with the SQLite database.
+
+## Related Files
+- [Product Context](./productContext.md) - Project overview and high-level design
+- [Active Context](./activeContext.md) - Current session focus and recent activities
+- [Decision Log](./decisionLog.md) - Key architectural decisions
+- [Git Backend Architecture](./git-backend-architecture.md) - Git backend component design
+- [Database Schema Design](./database-schema-design.md) - SQLite database schema design
+- [Part Management Workflow](./part-management-workflow.md) - Part lifecycle workflow design
+- [User Interface Architecture](./user-interface-architecture.md) - UI design and components
+
+## Related Decisions
+- [DEC-008](./decisionLog.md#dec-008---directory-structure-design) - Directory Structure Design
+
+## Implementation
+This directory structure will be implemented through:
+- Git repository configuration
+- Template files for new parts and components
+- Configuration files for directory templates
+- Integration with the Git Backend Manager for repository initialization

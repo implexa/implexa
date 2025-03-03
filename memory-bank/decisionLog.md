@@ -1,5 +1,7 @@
 # Implexa: Decision Log
 
+**Navigation:** [productContext](./productContext.md) | [activeContext](./activeContext.md) | [progress](./progress.md) | [decisionLog](./decisionLog.md) | [Memory Bank Index](./memory-bank-index.md)
+
 This document tracks key architectural decisions made during the development of Implexa, including the context, alternatives considered, and rationale for each decision.
 
 ## Decision Record Template
@@ -206,3 +208,152 @@ This document tracks key architectural decisions made during the development of 
   - Negative: More complex implementation compared to simpler approaches
   - Negative: Some operations require shell commands due to git2-rs limitations
 - **References:** git-backend-architecture.md, src/git_backend/mod.rs
+
+### DEC-012 - Unit Testing Approach
+- **Date:** 2025-03-03
+- **Status:** Accepted
+- **Context:** The project needed a comprehensive unit testing approach to ensure code quality, reliability, and maintainability. This approach needed to be consistent with the project's architecture and coding standards while following Rust ecosystem best practices.
+- **Decision:** Implement a comprehensive unit testing approach that includes:
+  - Test-Driven Development (TDD) where appropriate
+  - Comprehensive test coverage goals (80% line coverage for critical components)
+  - Isolation of components using mocks and test doubles
+  - Parameterized and property-based testing for complex logic
+  - Component-specific testing strategies for Git Backend, Database, and Workflow modules
+  - Continuous integration with automated testing and coverage analysis
+- **Alternatives:**
+  - Minimal testing approach: Faster development but less reliability
+  - End-to-end testing focus: Better user experience validation but slower feedback cycle
+  - Manual testing: Less upfront cost but higher long-term maintenance cost
+  - Third-party testing services: Less implementation effort but less control
+  - No formal testing strategy: Maximum flexibility but inconsistent quality
+- **Consequences:**
+  - Positive: Improved code quality and reliability through comprehensive testing
+  - Positive: Earlier detection of bugs and regressions
+  - Positive: Better documentation of component behavior through tests
+  - Positive: Easier refactoring and maintenance with test coverage
+  - Positive: Consistent testing practices across the codebase
+  - Negative: Initial development time increased due to test writing
+  - Negative: Learning curve for advanced testing techniques
+  - Negative: Maintenance overhead for test suite
+  - Negative: Potential for brittle tests if not designed properly
+- **References:** unit-testing-approach.md, coding-standards.md
+
+### DEC-011 - Database Schema Implementation
+- **Date:** 2025-03-03
+- **Status:** Implemented
+- **Context:** Following the database schema design (DEC-005), we needed to implement the SQLite database schema in Rust with a focus on type safety, error handling, and integration with the Git Backend Manager.
+- **Decision:** Implement the database schema using rusqlite with a modular structure consisting of entity-specific modules (Part, Revision, Relationship, etc.), each with its own manager for database operations.
+- **Alternatives:**
+  - ORM-based approach (e.g., Diesel): More abstraction but adds complexity and dependencies
+  - Single monolithic database manager: Simpler but less maintainable
+  - Raw SQL without abstraction: More direct but less type-safe and harder to maintain
+  - JavaScript/TypeScript implementation: Easier frontend integration but less performant and type-safe
+  - Different database (PostgreSQL, MySQL): More features but adds deployment complexity
+- **Consequences:**
+  - Positive: Strong typing and comprehensive error handling through Rust's type system
+  - Positive: Modular design with entity-specific managers improves maintainability
+  - Positive: Direct SQL queries provide full control over database operations
+  - Positive: Transaction support ensures data consistency
+  - Positive: Integration with Git Backend Manager through commit hash references
+  - Positive: Support for flexible metadata through key-value properties
+  - Positive: Configurable workflows through states and transitions
+  - Negative: Manual SQL queries require more code compared to ORM approaches
+  - Negative: Potential for SQL injection if not using prepared statements consistently
+  - Negative: Schema migrations will require additional implementation
+- **References:** database-schema-design.md, src/database/mod.rs, src/database/schema.rs
+
+### DEC-013 - Enhanced Part Numbering System
+- **Date:** 2025-03-03
+- **Status:** Implemented
+- **Context:** The original part numbering system used string-based part IDs with embedded category and subcategory codes. This approach had limitations in flexibility and maintainability, particularly when categories needed to be updated.
+- **Decision:** Implement an enhanced part numbering system with the following changes:
+  - Use sequential integer IDs as primary keys in the database
+  - Create separate Categories and Subcategories tables for user-configurable categories
+  - Generate display part numbers dynamically using the format `[Category Code]-[Subcategory Code]-[Sequential Number]`
+  - Start sequential numbers at 10000 to avoid leading zeros
+- **Alternatives:**
+  - Keep string-based part IDs: Simpler but less flexible for category updates
+  - Use UUIDs: More unique but less human-readable
+  - Use composite keys (category, subcategory, sequence): More normalized but more complex for references
+  - Embed category information in part properties: More flexible but less structured
+- **Consequences:**
+  - Positive: Categories and subcategories can be updated without breaking references
+  - Positive: User-configurable categories and subcategories provide more flexibility
+  - Positive: Integer primary keys improve database performance for joins and indexes
+  - Positive: Display part numbers maintain human readability while database uses efficient IDs
+  - Positive: Starting at 10000 eliminates leading zeros and provides room for growth
+  - Negative: Additional complexity in generating display part numbers
+  - Negative: Need to maintain separate Categories and Subcategories tables
+  - Negative: Potential for confusion between internal IDs and display part numbers
+- **References:** database-schema-design.md, src/database/part.rs, src/database/category.rs, src/database/schema.rs
+
+### DEC-014 - Part Management Implementation
+- **Date:** 2025-03-03
+- **Status:** Implemented
+- **Context:** Following the part management workflow design (DEC-006), we needed to implement the functionality for managing parts throughout their lifecycle, including creation, status transitions, and workflow enforcement.
+- **Decision:** Implement a comprehensive part management system with the following features:
+  - PartManagementManager for coordinating part lifecycle operations
+  - Integration with Git backend for branch management
+  - Role-based permission system (Designer, Viewer, Admin)
+  - Support for the complete part lifecycle (Draft, In Review, Released, Obsolete)
+  - Approval process with multiple reviewers
+  - Revision creation and management
+  - Comprehensive error handling with custom error types
+- **Alternatives:**
+  - Simplified state machine: Easier to implement but less flexible
+  - UI-driven workflow: More user-friendly but less programmatically accessible
+  - External workflow engine: More powerful but adds complexity
+  - Separate modules for each workflow state: More modular but more complex coordination
+  - No formal workflow implementation: Maximum flexibility but lacks consistency and traceability
+- **Consequences:**
+  - Positive: Complete implementation of the part management workflow as designed
+  - Positive: Strong integration between database and Git operations
+  - Positive: Role-based permissions ensure proper access control
+  - Positive: Transaction support ensures data consistency across operations
+  - Positive: Comprehensive error handling improves reliability and user feedback
+  - Positive: Support for parallel development of multiple parts
+  - Negative: Complex implementation with multiple dependencies
+  - Negative: Requires careful coordination between database and Git operations
+  - Negative: Permission system may need enhancement for larger teams
+- **References:** part-management-workflow.md, src/database/part_management.rs, src/database/part.rs, src/database/revision.rs, src/database/approval.rs
+
+## Related Files
+- [Product Context](./productContext.md) - Project overview and high-level design
+- [Active Context](./activeContext.md) - Current session focus and recent activities
+- [Progress Tracking](./progress.md) - Project status and task list
+- [Git Backend Architecture](./git-backend-architecture.md) - Git backend component design
+- [Database Schema Design](./database-schema-design.md) - SQLite database schema design
+- [Part Management Workflow](./part-management-workflow.md) - Part lifecycle workflow design
+- [User Interface Architecture](./user-interface-architecture.md) - UI design and components
+- [Directory Structure](./directory-structure.md) - File and directory organization
+- [Rust Module Refactoring Guide](./rust-module-refactoring-guide.md) - Guide for module organization
+- [Unit Testing Approach](./unit-testing-approach.md) - Testing philosophy and practices
+- [Coding Standards](./coding-standards.md) - Code style and practices
+
+## Decision Index by Component
+
+### Git Backend
+- [DEC-010](./decisionLog.md#dec-010---rust-module-organization-pattern) - Rust Module Organization Pattern
+- [DEC-004](./decisionLog.md#dec-004---git-backend-manager-architecture) - Git Backend Manager Architecture
+- [DEC-009](./decisionLog.md#dec-009---git-backend-manager-implementation) - Git Backend Manager Implementation
+
+### Database
+- [DEC-005](./decisionLog.md#dec-005---sqlite-database-schema-design) - SQLite Database Schema Design
+- [DEC-011](./decisionLog.md#dec-011---database-schema-implementation) - Database Schema Implementation
+- [DEC-013](./decisionLog.md#dec-013---enhanced-part-numbering-system) - Enhanced Part Numbering System
+
+### Part Management
+- [DEC-006](./decisionLog.md#dec-006---part-management-workflow-design) - Part Management Workflow Design
+- [DEC-014](./decisionLog.md#dec-014---part-management-implementation) - Part Management Implementation
+
+### User Interface
+- [DEC-007](./decisionLog.md#dec-007---user-interface-architecture) - User Interface Architecture
+
+### Project Structure
+- [DEC-008](./decisionLog.md#dec-008---directory-structure-design) - Directory Structure Design
+- [DEC-003](./decisionLog.md#dec-003---memory-bank-initialization) - Memory Bank Initialization
+
+### Development Practices
+- [DEC-012](./decisionLog.md#dec-012---unit-testing-approach) - Unit Testing Approach
+- [DEC-001](./decisionLog.md#dec-001---use-of-tauri-over-electron) - Use of Tauri over Electron
+- [DEC-002](./decisionLog.md#dec-002---enhanced-hybrid-part-numbering-schema) - Enhanced Hybrid Part Numbering Schema

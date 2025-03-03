@@ -48,4 +48,5 @@ Implementation of Phase 1 is underway, focusing on establishing the core compone
 - Gather user feedback on initial release
 
 ## More info
-- Check /proj/implexa-prd.md for the project requirements doc
+- See [Implexa Project Requirement Doc](./memory-bank/implexa-project-requirement-doc.md) for detailed project requirements
+- Explore the [Memory Bank](./memory-bank/memory-bank-index.md) for comprehensive project documentation

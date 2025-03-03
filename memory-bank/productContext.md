@@ -1,5 +1,7 @@
 # Implexa: Product Context
 
+**Navigation:** [productContext](./productContext.md) | [activeContext](./activeContext.md) | [progress](./progress.md) | [decisionLog](./decisionLog.md) | [Memory Bank Index](./memory-bank-index.md)
+
 ## Project Overview
 Implexa is a hardware-focused Product Lifecycle Management (PLM) and Product Data Management (PDM) solution that leverages Git for version control while remaining CAD-agnostic. Built with Tauri and Rust, it bridges the gap between software engineering practices and hardware design workflows, enabling efficient management of design files across multiple CAD platforms.
 
@@ -68,3 +70,17 @@ This Memory Bank contains the following core files:
 
 ## Project Name Origin
 Implexa comes from the Latin word "implex," meaning "interweaving" or "entanglement." The name reflects how the system helps manage the complex, interconnected relationships in hardware product development—parts, assemblies, revisions, alternates, variants, and ECNs all woven together into a coherent system. As a bonus, it contains the letters P, L, and M.
+
+## Related Files
+- [Implexa Project Requirement Doc](./implexa-project-requirement-doc.md) - Detailed project requirements
+- [Progress Tracking](./progress.md) - Current project status and task list
+- [Active Context](./activeContext.md) - Current session focus and recent activities
+- [Git Backend Architecture](./git-backend-architecture.md) - Design of the Git backend component
+- [Database Schema Design](./database-schema-design.md) - SQLite database schema design
+- [Part Management Workflow](./part-management-workflow.md) - Part lifecycle workflow design
+- [User Interface Architecture](./user-interface-architecture.md) - UI design and components
+- [Directory Structure](./directory-structure.md) - File and directory organization
+
+## External References
+- [projectBrief.md](../projectBrief.md) - Initial project brief in the root directory
+- [README.md](../README.md) - Project README file

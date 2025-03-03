@@ -1,5 +1,7 @@
 # SQLite Database Schema Design
 
+**Navigation:** [productContext](./productContext.md) | [activeContext](./activeContext.md) | [progress](./progress.md) | [decisionLog](./decisionLog.md) | [Memory Bank Index](./memory-bank-index.md)
+
 ## Overview
 
 The SQLite database is a critical component of Implexa that stores metadata for parts, relationships, and properties. This document outlines the database schema design, focusing on the structure, relationships, and integration with other components.
@@ -52,6 +54,17 @@ The database consists of several interconnected tables that store different aspe
 │ - Type          │       │                 │       │ - Is Initial    │
 │ - Description   │       │                 │       │ - Is Terminal   │
 └─────────────────┘       └─────────────────┘       └─────────────────┘
+
+┌─────────────────┐       ┌─────────────────┐       ┌─────────────────┐
+│  Categories     │       │  Subcategories  │       │  PartSequence   │
+│                 │       │                 │       │                 │
+│ - Category ID   │◄──┐   │ - Subcategory   │       │ - ID            │
+│ - Name          │   └───┤   ID            │       │ - Next Value    │
+│ - Code          │       │ - Category ID   │       │                 │
+│ - Description   │       │ - Name          │       │                 │
+│                 │       │ - Code          │       │                 │
+│                 │       │ - Description   │       │                 │
+└─────────────────┘       └─────────────────┘       └─────────────────┘
 ```
 
 ## Table Definitions
@@ -62,7 +75,7 @@ The `Parts` table is the central table that stores information about all parts i
 
 ```sql
 CREATE TABLE Parts (
-    part_id TEXT PRIMARY KEY,
+    part_id INTEGER PRIMARY KEY,
     category TEXT NOT NULL,
     subcategory TEXT NOT NULL,
     name TEXT NOT NULL,
@@ -77,6 +90,57 @@ CREATE INDEX idx_parts_subcategory ON Parts(subcategory);
 CREATE INDEX idx_parts_name ON Parts(name);
 ```
 
+### PartSequence
+
+The `PartSequence` table manages the sequential numbering for parts.
+
+```sql
+CREATE TABLE PartSequence (
+    id INTEGER PRIMARY KEY CHECK (id = 1), -- Only one row allowed
+    next_value INTEGER NOT NULL DEFAULT 10000
+);
+
+-- Initialize the sequence with starting value 10000
+INSERT OR IGNORE INTO PartSequence (id, next_value) VALUES (1, 10000);
+```
+
+### Categories
+
+The `Categories` table stores configurable categories for parts.
+
+```sql
+CREATE TABLE Categories (
+    category_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    code TEXT NOT NULL,
+    description TEXT,
+    UNIQUE(name),
+    UNIQUE(code)
+);
+
+CREATE INDEX idx_categories_code ON Categories(code);
+```
+
+### Subcategories
+
+The `Subcategories` table stores configurable subcategories for parts.
+
+```sql
+CREATE TABLE Subcategories (
+    subcategory_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    code TEXT NOT NULL,
+    description TEXT,
+    FOREIGN KEY (category_id) REFERENCES Categories(category_id) ON DELETE CASCADE,
+    UNIQUE(category_id, name),
+    UNIQUE(category_id, code)
+);
+
+CREATE INDEX idx_subcategories_code ON Subcategories(code);
+CREATE INDEX idx_subcategories_category_id ON Subcategories(category_id);
+```
+
 ### Revisions
 
 The `Revisions` table stores information about each revision of a part.
@@ -84,7 +148,7 @@ The `Revisions` table stores information about each revision of a part.
 ```sql
 CREATE TABLE Revisions (
     revision_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    part_id TEXT NOT NULL,
+    part_id INTEGER NOT NULL,
     version TEXT NOT NULL,
     status TEXT NOT NULL CHECK(status IN ('Draft', 'In Review', 'Released', 'Obsolete')),
     created_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -106,8 +170,8 @@ The `Relationships` table stores parent-child relationships between parts.
 ```sql
 CREATE TABLE Relationships (
     relationship_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    parent_part_id TEXT NOT NULL,
-    child_part_id TEXT NOT NULL,
+    parent_part_id INTEGER NOT NULL,
+    child_part_id INTEGER NOT NULL,
     type TEXT NOT NULL,
     quantity INTEGER NOT NULL DEFAULT 1,
     FOREIGN KEY (parent_part_id) REFERENCES Parts(part_id) ON DELETE CASCADE,
@@ -127,7 +191,7 @@ The `Properties` table stores key-value properties for parts and revisions.
 ```sql
 CREATE TABLE Properties (
     property_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    part_id TEXT,
+    part_id INTEGER,
     revision_id INTEGER,
     key TEXT NOT NULL,
     value TEXT,
@@ -150,7 +214,7 @@ The `ManufacturerParts` table stores information about manufacturer parts that c
 ```sql
 CREATE TABLE ManufacturerParts (
     mpn_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    part_id TEXT NOT NULL,
+    part_id INTEGER NOT NULL,
     manufacturer TEXT NOT NULL,
     mpn TEXT NOT NULL,
     description TEXT,
@@ -193,7 +257,7 @@ The `Files` table stores information about files associated with parts and revis
 ```sql
 CREATE TABLE Files (
     file_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    part_id TEXT,
+    part_id INTEGER,
     revision_id INTEGER,
     path TEXT NOT NULL,
     type TEXT NOT NULL,
@@ -413,3 +477,32 @@ WHERE r.part_id = ? AND r.version = (
 ## Conclusion
 
 This database schema design provides a solid foundation for the Implexa PLM/PDM system. It supports the core requirements of part management, revision control, relationship tracking, and workflow management while providing flexibility for future extensions. The integration with the Git Backend Manager ensures that file storage and metadata are coordinated, providing a comprehensive solution for hardware product lifecycle management.
+
+## Related Files
+- [Product Context](./productContext.md) - Project overview and high-level design
+- [Active Context](./activeContext.md) - Current session focus and recent activities
+- [Decision Log](./decisionLog.md) - Key architectural decisions
+- [Git Backend Architecture](./git-backend-architecture.md) - Git backend component design
+- [Part Management Workflow](./part-management-workflow.md) - Part lifecycle workflow design
+- [Coding Standards](./coding-standards.md) - Code style and practices
+- [Unit Testing Approach](./unit-testing-approach.md) - Testing philosophy and practices
+
+## Related Decisions
+- [DEC-005](./decisionLog.md#dec-005---sqlite-database-schema-design) - SQLite Database Schema Design
+- [DEC-011](./decisionLog.md#dec-011---database-schema-implementation) - Database Schema Implementation
+- [DEC-013](./decisionLog.md#dec-013---enhanced-part-numbering-system) - Enhanced Part Numbering System
+
+## Implementation
+This schema is implemented in the following files:
+- [src/database.rs](../src/database.rs) - Main Database module
+- [src/database/schema.rs](../src/database/schema.rs) - Schema creation and initialization
+- [src/database/part.rs](../src/database/part.rs) - Part entity and manager
+- [src/database/revision.rs](../src/database/revision.rs) - Revision entity and manager
+- [src/database/relationship.rs](../src/database/relationship.rs) - Relationship entity and manager
+- [src/database/property.rs](../src/database/property.rs) - Property entity and manager
+- [src/database/manufacturer_part.rs](../src/database/manufacturer_part.rs) - Manufacturer Part entity and manager
+- [src/database/approval.rs](../src/database/approval.rs) - Approval entity and manager
+- [src/database/file.rs](../src/database/file.rs) - File entity and manager
+- [src/database/workflow.rs](../src/database/workflow.rs) - Workflow entities and manager
+- [src/database/category.rs](../src/database/category.rs) - Category and Subcategory entities and manager
+- [src/database/part_management.rs](../src/database/part_management.rs) - Part Management implementation

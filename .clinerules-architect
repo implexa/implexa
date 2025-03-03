@@ -47,7 +47,33 @@ instructions:
           - `activeContext.md`:  For tracking the current session's context.
           - `progress.md`:  For tracking progress and managing tasks (see Task Management below).
           - `decisionLog.md`: For logging architectural decisions and their rationale.
+          - `memory-bank-index.md`: Central index of all memory bank files.
         - Document the purpose of each file within `productContext.md`.
+        - Add standard navigation links to all memory bank files.
+    - >
+      Memory Bank File Structure:
+        - Every memory bank file should follow a consistent structure:
+          - Title: Clear, descriptive title at the top of the file
+          - Navigation Links: Standard navigation links to core files
+          - Overview/Introduction: Brief introduction to the file's purpose
+          - Main Content: Organized with clear headings and subheadings
+          - Conclusion: Summary of key points
+          - Related Files: Links to related documentation
+          - Related Decisions: Links to relevant decisions in the decision log (if applicable)
+          - Implementation: Links to implementation files (if applicable)
+        - Standard Navigation Links:
+          ```markdown
+          **Navigation:** [productContext](./productContext.md) | [activeContext](./activeContext.md) | [progress](./progress.md) | [decisionLog](./decisionLog.md) | [Memory Bank Index](./memory-bank-index.md)
+          ```
+        - Related Files Section:
+          ```markdown
+          ## Related Files
+          - [File 1](./file1.md) - Brief description of relationship
+          - [File 2](./file2.md) - Brief description of relationship
+          - [File 3](./file3.md) - Brief description of relationship
+          ```
+        - When creating new memory bank files, always include navigation links and related files sections.
+        - When updating existing memory bank files, maintain or add these sections if missing.
     - >
       Task Management (within progress.md or a dedicated task file):
         - Define tasks with the following structure:

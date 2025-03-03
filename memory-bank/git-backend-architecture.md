@@ -1,5 +1,7 @@
 # Git Backend Manager Architecture
 
+**Navigation:** [productContext](./productContext.md) | [activeContext](./activeContext.md) | [progress](./progress.md) | [decisionLog](./decisionLog.md) | [Memory Bank Index](./memory-bank-index.md)
+
 ## Overview
 
 The Git Backend Manager is a core component of Implexa that handles all interactions with Git repositories. It provides a high-level abstraction over Git operations while preserving PLM metadata and ensuring data integrity. This document outlines the architectural design of this component.
@@ -469,3 +471,27 @@ impl GitBackendManager {
 ## Conclusion
 
 The Git Backend Manager is a critical component of Implexa that provides a robust foundation for version control of PLM data. Its modular design, comprehensive error handling, and integration with other components ensure that it can meet the complex requirements of hardware product development while leveraging the power of Git for version control.
+
+## Related Files
+- [Product Context](./productContext.md) - Project overview and high-level design
+- [Active Context](./activeContext.md) - Current session focus and recent activities
+- [Decision Log](./decisionLog.md) - Key architectural decisions
+- [Database Schema Design](./database-schema-design.md) - SQLite database schema design
+- [Part Management Workflow](./part-management-workflow.md) - Part lifecycle workflow design
+- [Rust Module Refactoring Guide](./rust-module-refactoring-guide.md) - Guide for module organization
+- [Coding Standards](./coding-standards.md) - Code style and practices
+
+## Related Decisions
+- [DEC-004](./decisionLog.md#dec-004---git-backend-manager-architecture) - Git Backend Manager Architecture
+- [DEC-009](./decisionLog.md#dec-009---git-backend-manager-implementation) - Git Backend Manager Implementation
+- [DEC-010](./decisionLog.md#dec-010---rust-module-organization-pattern) - Rust Module Organization Pattern
+
+## Implementation
+This architecture is implemented in the following files:
+- [src/git_backend.rs](../src/git_backend.rs) - Main Git Backend Manager module
+- [src/git_backend/repository.rs](../src/git_backend/repository.rs) - Repository Manager implementation
+- [src/git_backend/operation.rs](../src/git_backend/operation.rs) - Operation Handler implementation
+- [src/git_backend/lfs.rs](../src/git_backend/lfs.rs) - LFS Manager implementation
+- [src/git_backend/hook.rs](../src/git_backend/hook.rs) - Hook Manager implementation
+- [src/git_backend/conflict.rs](../src/git_backend/conflict.rs) - Conflict Resolver implementation
+- [src/git_backend/auth.rs](../src/git_backend/auth.rs) - Auth Provider implementation

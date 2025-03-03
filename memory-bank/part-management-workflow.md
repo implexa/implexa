@@ -1,5 +1,7 @@
 # Part Management Workflow
 
+**Navigation:** [productContext](./productContext.md) | [activeContext](./activeContext.md) | [progress](./progress.md) | [decisionLog](./decisionLog.md) | [Memory Bank Index](./memory-bank-index.md)
+
 ## Overview
 
 The Part Management Workflow defines how parts are created, modified, reviewed, approved, and released within Implexa. This document outlines the workflow architecture, including states, transitions, approvals, and integration with other components, with a focus on simplicity and usability for small teams.
@@ -535,3 +537,24 @@ The Part Management Workflow includes several security considerations:
 ## Conclusion
 
 The Part Management Workflow provides a simple yet robust foundation for managing parts throughout their lifecycle, with a focus on usability for small teams. Its integration with Git and the database ensures that all changes are tracked and traceable, while its support for multiple parts in draft state enables efficient parallel development. The simplified approval process, similar to Git merge/pull requests, makes it easy for team members to collaborate on part design and review.
+
+## Related Files
+- [Product Context](./productContext.md) - Project overview and high-level design
+- [Active Context](./activeContext.md) - Current session focus and recent activities
+- [Decision Log](./decisionLog.md) - Key architectural decisions
+- [Git Backend Architecture](./git-backend-architecture.md) - Git backend component design
+- [Database Schema Design](./database-schema-design.md) - SQLite database schema design
+- [Directory Structure](./directory-structure.md) - File and directory organization
+- [User Interface Architecture](./user-interface-architecture.md) - UI design and components
+
+## Related Decisions
+- [DEC-006](./decisionLog.md#dec-006---part-management-workflow-design) - Part Management Workflow Design
+- [DEC-014](./decisionLog.md#dec-014---part-management-implementation) - Part Management Implementation
+
+## Implementation
+This workflow is implemented in the following files:
+- [src/database/part_management.rs](../src/database/part_management.rs) - Part Management implementation
+- [src/database/part.rs](../src/database/part.rs) - Part entity and manager
+- [src/database/revision.rs](../src/database/revision.rs) - Revision entity and manager
+- [src/database/approval.rs](../src/database/approval.rs) - Approval entity and manager
+- [src/database/workflow.rs](../src/database/workflow.rs) - Workflow entities and manager

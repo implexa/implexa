@@ -77,13 +77,13 @@ Current Phase: Phase 1 (Core Infrastructure)
 
 #### Development Environment
 - **Task Name:** Set up development environment
-- **Status:** TODO
+- **Status:** COMPLETED
 - **Dependencies:** None
 - **Detailed Scope:** Document and automate the setup of the development environment including Rust, Node.js, and Tauri installation.
 
 #### CI/CD Pipeline
 - **Task Name:** Set up CI/CD pipeline
-- **Status:** TODO
+- **Status:** COMPLETED
 - **Dependencies:** None
 - **Detailed Scope:** Configure GitHub Actions or similar CI/CD service for automated testing and building.
 

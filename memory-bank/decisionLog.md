@@ -317,6 +317,36 @@ This document tracks key architectural decisions made during the development of 
   - Negative: Permission system may need enhancement for larger teams
 - **References:** part-management-workflow.md, src/database/part_management.rs, src/database/part.rs, src/database/revision.rs, src/database/approval.rs
 
+### DEC-015 - Directory Structure Implementation Approach
+- **Date:** 2025-03-04
+- **Status:** Proposed
+- **Context:** Following the directory structure design (DEC-008), we needed to implement the configurable directory structure system for parts and libraries. This implementation needed to support minimal, standard, and extended templates while maintaining consistency and Git integration.
+- **Decision:** Implement the directory structure system with the following approach:
+  - Create a JSON schema for directory templates that defines directories, subdirectories, and files
+  - Implement three standard templates (minimal, standard, extended) with different levels of complexity
+  - Add support for custom templates in the config/directory-templates/custom/ directory
+  - Create a directory creation function that generates part directories based on templates
+  - Implement template selection in the UI for part creation
+  - Store templates in the config/directory-templates/ directory of the PLM repository
+- **Alternatives:**
+  - Hard-coded directory structure: Simpler but less flexible and configurable
+  - Database-driven structure: More dynamic but less Git-friendly
+  - File-based templates without schema: Easier to implement but less validation
+  - Directory structure defined in code: More type-safe but less user-configurable
+  - Completely custom structure per part: Maximum flexibility but lacks consistency
+- **Consequences:**
+  - Positive: Configurable approach avoids empty directories while providing guidance
+  - Positive: JSON schema provides validation and structure for templates
+  - Positive: Standard templates offer different complexity levels for different needs
+  - Positive: Custom templates allow users to define their own structures
+  - Positive: Template selection in UI improves user experience
+  - Positive: Implementation aligns with the Git Backend Manager architecture
+  - Negative: JSON schema adds complexity to implementation
+  - Negative: Template validation requires additional code
+  - Negative: UI for template selection adds frontend complexity
+  - Negative: Multiple templates require maintenance and documentation
+- **References:** directory-structure.md, src/git_backend/repository.rs
+
 ## Related Files
 - [Product Context](./productContext.md) - Project overview and high-level design
 - [Active Context](./activeContext.md) - Current session focus and recent activities
@@ -351,6 +381,7 @@ This document tracks key architectural decisions made during the development of 
 
 ### Project Structure
 - [DEC-008](./decisionLog.md#dec-008---directory-structure-design) - Directory Structure Design
+- [DEC-015](./decisionLog.md#dec-015---directory-structure-implementation-approach) - Directory Structure Implementation Approach
 - [DEC-003](./decisionLog.md#dec-003---memory-bank-initialization) - Memory Bank Initialization
 
 ### Development Practices

@@ -313,6 +313,10 @@ npm run tauri build -- --target [platform]
 3. **UI Tests**: Test component rendering and user interactions
 4. **End-to-End Tests**: Test complete workflows from UI to filesystem
 
+
+## Project Name Origin
+Implexa comes from the Latin word "implex," meaning "interweaving" or "entanglement." The name reflects how the system helps manage the complex, interconnected relationships in hardware product development—parts, assemblies, revisions, alternates, variants, and ECNs all woven together into a coherent system. As a bonus, it contains the letters P, L, and M.
+
 ## Conclusion
 
 Implexa represents a modern approach to PLM/PDM for hardware developers, combining Git-based version control with a structured metadata system. Built with Tauri and Rust, it offers superior performance, security, and reliability compared to traditional PLM systems, while maintaining a user-friendly interface that integrates naturally with hardware development workflows.

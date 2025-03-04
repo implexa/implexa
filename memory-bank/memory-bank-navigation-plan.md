@@ -51,9 +51,6 @@ This index provides a categorized list of all documentation in the memory bank.
 - [Coding Standards](./coding-standards.md) - Code style and practices
 - [Rust Module Refactoring Guide](./rust-module-refactoring-guide.md) - Guide for module organization
 - [Unit Testing Approach](./unit-testing-approach.md) - Testing philosophy and practices
-
-## Project Requirements
-- [Implexa Project Requirement Doc](./implexa-project-requirement-doc.md) - Detailed project requirements
 ```
 
 ### 3. Add "Related Files" Sections

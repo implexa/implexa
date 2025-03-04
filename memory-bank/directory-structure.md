@@ -439,23 +439,195 @@ The directory structure will be implemented in phases:
 ### Phase 1: Basic Structure
 
 1. Implement the top-level repository structure
+   - This is already implemented in `RepositoryManager::setup_plm_structure()` which creates the basic directory structure
+   - The method creates directories for parts, templates, scripts, config and their subdirectories
+   - It also creates .gitattributes for LFS configuration and .gitignore files
+
 2. Implement the basic part directory structure
+   - Create a function to generate a part directory with the appropriate structure
+   - This should be implemented in a new module like `src/git_backend/directory.rs`
+   - The function should take parameters for part number, category, and subcategory
+
 3. Set up Git attributes and ignore files
+   - Already implemented in `RepositoryManager::setup_plm_structure()`
+   - The .gitattributes file configures Git LFS for binary files
+   - The .gitignore file excludes common temporary and build files
+
 4. Create basic templates for new parts
+   - Create template files for different part types (electronic, mechanical, etc.)
+   - Store these templates in the templates/ directory
+   - Templates should include README.md and basic directory structure
 
 ### Phase 2: Configurability
 
 1. Implement the directory template system
+   - Create JSON schema for directory templates in `config/directory-templates/`
+   - Implement the following template files:
+     - `minimal.json`: Contains only essential directories
+     - `standard.json`: Contains commonly used directories (default)
+     - `extended.json`: Contains all possible directories
+   - Each template should define which directories to create for a part
+
 2. Create minimal, standard, and extended templates
+   - Minimal template should include only metadata.db, README.md, and design/ directory
+   - Standard template should include metadata.db, README.md, design/, manufacturing/, and documentation/ directories
+   - Extended template should include all directories described in this document
+
 3. Add support for custom templates
+   - Implement a mechanism to load custom templates from `config/directory-templates/custom/`
+   - Allow users to create and modify their own templates
+   - Provide a UI for template selection when creating new parts
+
 4. Implement the library directory structure
+   - Create the structure for KiCad libraries (symbols, footprints, 3D models)
+   - Implement the common library structure for CAD-agnostic components
+   - Set up the relationship between library components and parts
 
 ### Phase 3: Advanced Features
 
 1. Implement the scripts directory with utility scripts
+   - Create setup scripts for repository initialization
+   - Implement import/export scripts for different CAD tools
+   - Add validation scripts for design rule checks
+
 2. Set up the config directory with workflow definitions
+   - Create default workflow definitions in JSON format
+   - Implement category and subcategory definitions
+   - Set up application settings for the PLM system
+
 3. Implement the templates directory with advanced templates
+   - Create templates for different part types with specialized structures
+   - Implement documentation templates for specifications and user guides
+   - Add templates for test plans and results
+
 4. Add support for custom directory structures
+   - Implement a mechanism for part-type-specific directory structures
+   - Allow for project-specific customizations
+   - Provide migration tools for updating existing parts to new structures
+
+## Implementation Details
+
+### Directory Template JSON Schema
+
+Directory templates should follow this JSON schema:
+
+```json
+{
+  "name": "Standard Template",
+  "description": "Standard directory structure for parts",
+  "version": "1.0.0",
+  "directories": [
+    {
+      "path": "design",
+      "description": "Design files",
+      "required": true,
+      "subdirectories": [
+        {
+          "path": "models",
+          "description": "3D models",
+          "required": false
+        },
+        {
+          "path": "schematics",
+          "description": "Schematics and diagrams",
+          "required": false
+        }
+      ]
+    },
+    {
+      "path": "manufacturing",
+      "description": "Manufacturing output files",
+      "required": true,
+      "subdirectories": [
+        {
+          "path": "bom",
+          "description": "Bill of Materials",
+          "required": true
+        },
+        {
+          "path": "assembly",
+          "description": "Assembly instructions",
+          "required": false
+        }
+      ]
+    },
+    {
+      "path": "documentation",
+      "description": "Documentation files",
+      "required": true,
+      "subdirectories": [
+        {
+          "path": "datasheets",
+          "description": "Component datasheets",
+          "required": false
+        },
+        {
+          "path": "specifications",
+          "description": "Specifications",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "README.md",
+      "description": "Human-readable part description",
+      "required": true,
+      "template": "templates/readme/standard.md"
+    },
+    {
+      "path": "metadata.db",
+      "description": "SQLite database with part metadata",
+      "required": true,
+      "template": "templates/database/standard.db"
+    }
+  ]
+}
+```
+
+### Directory Creation Function
+
+The directory creation function should be implemented as follows:
+
+```rust
+/// Creates a part directory with the specified structure
+pub fn create_part_directory(
+    repo_path: &Path,
+    part_number: &str,
+    category: &str,
+    subcategory: &str,
+    template_name: &str,
+) -> Result<PathBuf> {
+    // Load the specified template
+    let template = load_directory_template(template_name)?;
+    
+    // Create the part directory
+    let part_dir = repo_path.join("parts").join(format!("{}-{}-{}", category, subcategory, part_number));
+    std::fs::create_dir_all(&part_dir)?;
+    
+    // Create directories from the template
+    for dir in &template.directories {
+        create_directory_from_template(&part_dir, dir)?;
+    }
+    
+    // Create files from the template
+    for file in &template.files {
+        create_file_from_template(&part_dir, file)?;
+    }
+    
+    Ok(part_dir)
+}
+```
+
+### Template Selection UI
+
+The UI should provide a way for users to select a directory template when creating a new part:
+
+1. Show a dropdown or radio buttons with available templates
+2. Display a description of each template
+3. Allow users to preview the directory structure
+4. Provide an option to customize the template
 
 ## Conclusion
 

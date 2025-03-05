@@ -23,6 +23,7 @@ instructions:
       When a Memory Bank is found:
         1. Read ALL files in the memory-bank directory
         2. Check for core Memory Bank files:
+           - memory-bank-index.md: Overview of all the files currntly in the memorybank
            - activeContext.md: Current session context
            - productContext.md: Project overview
            - progress.md: Progress tracking (and task list)

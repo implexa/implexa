@@ -371,6 +371,7 @@ This document tracks key architectural decisions made during the development of 
 - [DEC-005](./decisionLog.md#dec-005---sqlite-database-schema-design) - SQLite Database Schema Design
 - [DEC-011](./decisionLog.md#dec-011---database-schema-implementation) - Database Schema Implementation
 - [DEC-013](./decisionLog.md#dec-013---enhanced-part-numbering-system) - Enhanced Part Numbering System
+- [DEC-018](./decisionLog.md#dec-018---database-connection-management-refactoring) - Database Connection Management Refactoring
 
 ### Part Management
 - [DEC-006](./decisionLog.md#dec-006---part-management-workflow-design) - Part Management Workflow Design
@@ -444,3 +445,32 @@ This document tracks key architectural decisions made during the development of 
   - Negative: Some platform-specific features require additional implementation
   - Negative: Requires careful state management between frontend and backend
 - **References:** tauri.conf.json, src/main.rs, build.rs, src/commands.rs, activeContext.md, progress.md
+
+### DEC-018 - Database Connection Management Refactoring
+- **Date:** 2025-03-04
+- **Status:** Accepted
+- **Context:** During the implementation of unit tests, several issues were identified with the current database connection management approach:
+  1. Multiple mutable borrows of the same connection in test code
+  2. Type mismatches between `&Transaction` and `&mut Connection`
+  3. Inconsistent mutability requirements across manager structs
+  4. Difficulty in mocking database connections for testing
+- **Decision:** Implement a `ConnectionManager` with interior mutability that provides controlled access to the database connection. This approach uses `RefCell` to manage mutable access to the connection and provides a consistent API for executing operations and managing transactions.
+- **Alternatives:**
+  - **Connection Pool Approach:** Implement a connection pool that provides connections on demand, avoiding multiple mutable borrows. Rejected as overly complex for our needs.
+  - **Manager Factory Approach:** Create a factory that produces manager instances with their own connection. Rejected due to potential resource management issues.
+  - **Transaction-Based Approach:** Redesign managers to accept transactions instead of connections. Partially incorporated into the chosen solution.
+  - **Keep current approach but fix individual issues:** Simpler but doesn't address the root architectural issue.
+  - **Complete rewrite of database layer:** More thorough but excessive for the issues identified.
+  - **Use an ORM like Diesel:** Different approach that might avoid some issues but introduces new complexity.
+  - **Separate read-only and read-write operations:** More complex API but clearer mutability requirements.
+- **Consequences:**
+  - Positive: Resolves multiple mutable borrow issues in tests through interior mutability
+  - Positive: Provides clearer ownership and lifetime semantics
+  - Positive: Improves testability through better isolation and easier mocking
+  - Positive: More consistent API across manager structs
+  - Positive: Simplifies transaction management
+  - Positive: Eliminates type mismatches between `&Transaction` and `&mut Connection`
+  - Negative: Requires significant refactoring of existing code
+  - Negative: Interior mutability adds some complexity to the codebase
+  - Negative: Potential for runtime borrow errors if not used carefully
+- **References:** activeContext.md, progress.md, src/database/part.rs, src/database/part_management.rs, src/database/schema.rs, database-connection-refactoring-guide.md

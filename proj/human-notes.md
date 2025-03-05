@@ -5,6 +5,7 @@
 - Tell the ai to read the project requriements (put them in the memory bank)
 - time in utc
 - part categories should be configurable in a cfg file
+- Move to Tauri 2.0 (not sure why we are on Tauri 1.5?)
 
 
 

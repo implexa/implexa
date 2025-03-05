@@ -2,9 +2,10 @@
 //!
 //! This module provides functionality for managing parts in the database.
 
-use rusqlite::{Connection, params, Row, Result as SqliteResult, OptionalExtension};
+use rusqlite::{Connection, Transaction, params, Row, Result as SqliteResult, OptionalExtension};
 use std::time::{SystemTime, UNIX_EPOCH};
-use crate::database::schema::DatabaseResult;
+use crate::database::schema::{DatabaseResult, DatabaseError};
+use crate::database::connection_manager::ConnectionManager;
 
 /// Represents a part in the system
 #[derive(Debug, Clone)]
@@ -116,8 +117,8 @@ pub fn display_part_number(&self, connection: &rusqlite::Connection) -> String {
 
 /// Manager for part operations
 pub struct PartManager<'a> {
-    /// Connection to the SQLite database
-    connection: &'a mut Connection,
+    /// Connection manager for the SQLite database
+    connection_manager: &'a ConnectionManager,
 }
 
 impl<'a> PartManager<'a> {
@@ -125,13 +126,30 @@ impl<'a> PartManager<'a> {
     ///
     /// # Arguments
     ///
-    /// * `connection` - Mutable connection to the SQLite database
+    /// * `connection_manager` - Connection manager for the SQLite database
     ///
     /// # Returns
     ///
     /// A new PartManager instance
-    pub fn new(connection: &'a mut Connection) -> Self {
-        Self { connection }
+    pub fn new(connection_manager: &'a ConnectionManager) -> Self {
+        Self { connection_manager }
+    }
+    
+    /// Create a new PartManager with a transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `transaction` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// A new PartManager instance
+    ///
+    /// # Note
+    ///
+    /// This is a temporary method for backward compatibility during migration
+    pub fn new_with_transaction(_transaction: &'a Transaction) -> Self {
+        unimplemented!("This method is a placeholder for backward compatibility during migration")
     }
     /// Get the next part ID from the sequence
     ///
@@ -143,9 +161,38 @@ impl<'a> PartManager<'a> {
     ///
     /// Returns a DatabaseError if the next part ID could not be retrieved
     pub fn get_next_part_id(&self) -> DatabaseResult<i64> {
-        // Create a transaction for atomicity
-        let mut tx = self.connection.transaction()?;
-        
+        self.connection_manager.transaction(|tx| {
+            // Get the current next_value
+            let next_id: i64 = tx.query_row(
+                "SELECT next_value FROM PartSequence WHERE id = 1",
+                [],
+                |row| row.get(0),
+            )?;
+            
+            // Increment the next_value
+            tx.execute(
+                "UPDATE PartSequence SET next_value = next_value + 1 WHERE id = 1",
+                [],
+            )?;
+            
+            Ok(next_id)
+        }).map_err(DatabaseError::from)
+    }
+    
+    /// Get the next part ID from the sequence within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// The next part ID
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the next part ID could not be retrieved
+    pub fn get_next_part_id_in_transaction(&self, tx: &Transaction) -> DatabaseResult<i64> {
         // Get the current next_value
         let next_id: i64 = tx.query_row(
             "SELECT next_value FROM PartSequence WHERE id = 1",
@@ -158,8 +205,6 @@ impl<'a> PartManager<'a> {
             "UPDATE PartSequence SET next_value = next_value + 1 WHERE id = 1",
             [],
         )?;
-        
-        tx.commit()?;
         
         Ok(next_id)
     }
@@ -219,6 +264,50 @@ impl<'a> PartManager<'a> {
     ///
     /// Returns a DatabaseError if the part could not be created
     pub fn create_part(&self, part: &Part) -> DatabaseResult<()> {
+        self.connection_manager.execute_mut(|conn| {
+            // Convert SystemTime to seconds since UNIX_EPOCH for SQLite
+            let created_secs = part.created_date
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs() as i64;
+            
+            let modified_secs = part.modified_date
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs() as i64;
+                
+            conn.execute(
+                "INSERT INTO Parts (part_id, category, subcategory, name, description, created_date, modified_date)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                params![
+                    part.part_id,
+                    part.category,
+                    part.subcategory,
+                    part.name,
+                    part.description,
+                    created_secs,
+                    modified_secs,
+                ],
+            )?;
+            Ok(())
+        }).map_err(DatabaseError::from)
+    }
+    
+    /// Create a part in the database with a specific part_id within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `part` - The part to create
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// Ok(()) if the part was successfully created
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the part could not be created
+    pub fn create_part_in_transaction(&self, part: &Part, tx: &Transaction) -> DatabaseResult<()> {
         // Convert SystemTime to seconds since UNIX_EPOCH for SQLite
         let created_secs = part.created_date
             .duration_since(UNIX_EPOCH)
@@ -230,7 +319,7 @@ impl<'a> PartManager<'a> {
             .unwrap_or_default()
             .as_secs() as i64;
             
-        self.connection.execute(
+        tx.execute(
             "INSERT INTO Parts (part_id, category, subcategory, name, description, created_date, modified_date)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
@@ -260,14 +349,16 @@ impl<'a> PartManager<'a> {
     ///
     /// Returns a DatabaseError if the part could not be found
     pub fn get_part(&self, part_id: i64) -> DatabaseResult<Part> {
-        let part = self.connection.query_row(
-            "SELECT part_id, category, subcategory, name, description, created_date, modified_date
-             FROM Parts
-             WHERE part_id = ?1",
-            params![part_id],
-            |row| self.row_to_part(row),
-        )?;
-        Ok(part)
+        self.connection_manager.execute(|conn| {
+            let part = conn.query_row(
+                "SELECT part_id, category, subcategory, name, description, created_date, modified_date
+                 FROM Parts
+                 WHERE part_id = ?1",
+                params![part_id],
+                |row| self.row_to_part(row),
+            )?;
+            Ok(part)
+        }).map_err(DatabaseError::from)
     }
 
     /// Get all parts
@@ -280,17 +371,19 @@ impl<'a> PartManager<'a> {
     ///
     /// Returns a DatabaseError if the parts could not be retrieved
     pub fn get_all_parts(&self) -> DatabaseResult<Vec<Part>> {
-        let mut stmt = self.connection.prepare(
-            "SELECT part_id, category, subcategory, name, description, created_date, modified_date
-             FROM Parts
-             ORDER BY category, subcategory, name",
-        )?;
-        let parts_iter = stmt.query_map([], |row| self.row_to_part(row))?;
-        let mut parts = Vec::new();
-        for part_result in parts_iter {
-            parts.push(part_result?);
-        }
-        Ok(parts)
+        self.connection_manager.execute(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT part_id, category, subcategory, name, description, created_date, modified_date
+                 FROM Parts
+                 ORDER BY category, subcategory, name",
+            )?;
+            let parts_iter = stmt.query_map([], |row| self.row_to_part(row))?;
+            let mut parts = Vec::new();
+            for part_result in parts_iter {
+                parts.push(part_result?);
+            }
+            Ok(parts)
+        }).map_err(DatabaseError::from)
     }
 
     /// Get parts by category
@@ -307,18 +400,20 @@ impl<'a> PartManager<'a> {
     ///
     /// Returns a DatabaseError if the parts could not be retrieved
     pub fn get_parts_by_category(&self, category: &str) -> DatabaseResult<Vec<Part>> {
-        let mut stmt = self.connection.prepare(
-            "SELECT part_id, category, subcategory, name, description, created_date, modified_date
-             FROM Parts
-             WHERE category = ?1
-             ORDER BY subcategory, name",
-        )?;
-        let parts_iter = stmt.query_map(params![category], |row| self.row_to_part(row))?;
-        let mut parts = Vec::new();
-        for part_result in parts_iter {
-            parts.push(part_result?);
-        }
-        Ok(parts)
+        self.connection_manager.execute(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT part_id, category, subcategory, name, description, created_date, modified_date
+                 FROM Parts
+                 WHERE category = ?1
+                 ORDER BY subcategory, name",
+            )?;
+            let parts_iter = stmt.query_map(params![category], |row| self.row_to_part(row))?;
+            let mut parts = Vec::new();
+            for part_result in parts_iter {
+                parts.push(part_result?);
+            }
+            Ok(parts)
+        }).map_err(DatabaseError::from)
     }
 
     /// Update a part
@@ -335,26 +430,28 @@ impl<'a> PartManager<'a> {
     ///
     /// Returns a DatabaseError if the part could not be updated
     pub fn update_part(&self, part: &Part) -> DatabaseResult<()> {
-        // Convert SystemTime to seconds since UNIX_EPOCH for SQLite
-        let modified_secs = part.modified_date
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs() as i64;
-            
-        self.connection.execute(
-            "UPDATE Parts
-             SET category = ?2, subcategory = ?3, name = ?4, description = ?5, modified_date = ?6
-             WHERE part_id = ?1",
-            params![
-                part.part_id,
-                part.category,
-                part.subcategory,
-                part.name,
-                part.description,
-                modified_secs,
-            ],
-        )?;
-        Ok(())
+        self.connection_manager.execute_mut(|conn| {
+            // Convert SystemTime to seconds since UNIX_EPOCH for SQLite
+            let modified_secs = part.modified_date
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs() as i64;
+                
+            conn.execute(
+                "UPDATE Parts
+                 SET category = ?2, subcategory = ?3, name = ?4, description = ?5, modified_date = ?6
+                 WHERE part_id = ?1",
+                params![
+                    part.part_id,
+                    part.category,
+                    part.subcategory,
+                    part.name,
+                    part.description,
+                    modified_secs,
+                ],
+            )?;
+            Ok(())
+        }).map_err(DatabaseError::from)
     }
 
     /// Delete a part
@@ -371,11 +468,13 @@ impl<'a> PartManager<'a> {
     ///
     /// Returns a DatabaseError if the part could not be deleted
     pub fn delete_part(&self, part_id: i64) -> DatabaseResult<()> {
-        self.connection.execute(
-            "DELETE FROM Parts WHERE part_id = ?1",
-            params![part_id],
-        )?;
-        Ok(())
+        self.connection_manager.execute_mut(|conn| {
+            conn.execute(
+                "DELETE FROM Parts WHERE part_id = ?1",
+                params![part_id],
+            )?;
+            Ok(())
+        }).map_err(DatabaseError::from)
     }
 
     /// Get parts by display part number
@@ -401,21 +500,23 @@ impl<'a> PartManager<'a> {
         let category_code = parts[0];
         let subcategory_code = parts[1];
         
-        // Find parts with matching category and subcategory codes
-        let mut stmt = self.connection.prepare(
-            "SELECT p.part_id, p.category, p.subcategory, p.name, p.description, p.created_date, p.modified_date
-             FROM Parts p
-             JOIN Categories c ON UPPER(p.category) = UPPER(c.name)
-             JOIN Subcategories s ON UPPER(p.subcategory) = UPPER(s.name) AND s.category_id = c.category_id
-             WHERE c.code = ?1 AND s.code = ?2",
-        )?;
-        
-        let parts_iter = stmt.query_map(params![category_code, subcategory_code], |row| self.row_to_part(row))?;
-        let mut parts = Vec::new();
-        for part_result in parts_iter {
-            parts.push(part_result?);
-        }
-        Ok(parts)
+        self.connection_manager.execute(|conn| {
+            // Find parts with matching category and subcategory codes
+            let mut stmt = conn.prepare(
+                "SELECT p.part_id, p.category, p.subcategory, p.name, p.description, p.created_date, p.modified_date
+                 FROM Parts p
+                 JOIN Categories c ON UPPER(p.category) = UPPER(c.name)
+                 JOIN Subcategories s ON UPPER(p.subcategory) = UPPER(s.name) AND s.category_id = c.category_id
+                 WHERE c.code = ?1 AND s.code = ?2",
+            )?;
+            
+            let parts_iter = stmt.query_map(params![category_code, subcategory_code], |row| self.row_to_part(row))?;
+            let mut parts = Vec::new();
+            for part_result in parts_iter {
+                parts.push(part_result?);
+            }
+            Ok(parts)
+        }).map_err(DatabaseError::from)
     }
 
     /// Convert a database row to a Part
@@ -464,11 +565,11 @@ mod tests {
         let db_path = temp_dir.path().join("test.db");
 
         // Create a new database manager and initialize the schema
-        let mut db_manager = DatabaseManager::new(&db_path).unwrap();
+        let db_manager = DatabaseManager::new(&db_path).unwrap();
         db_manager.initialize_schema().unwrap();
 
         // Create a part manager
-        let mut part_manager = PartManager::new(db_manager.connection());
+        let part_manager = PartManager::new(db_manager.connection_manager());
 
         // Get the next part ID
         let part_id = part_manager.get_next_part_id().unwrap();
@@ -496,7 +597,8 @@ mod tests {
         assert_eq!(retrieved_part.description, part.description);
 
         // Check the display part number format
-        let display_number = part.display_part_number(db_manager.connection());
+        let conn = db_manager.connection_manager().get_raw_connection();
+        let display_number = part.display_part_number(&conn);
         assert!(display_number.starts_with("EL-RES-"));
         assert!(display_number.contains(&part_id.to_string()));
     }
@@ -508,12 +610,13 @@ mod tests {
         let db_path = temp_dir.path().join("test.db");
 
         // Create a new database manager and initialize the schema
-        let mut db_manager = DatabaseManager::new(&db_path).unwrap();
+        let db_manager = DatabaseManager::new(&db_path).unwrap();
         db_manager.initialize_schema().unwrap();
 
         // Test with database-defined categories
+        let conn = db_manager.connection_manager().get_raw_connection();
         let display_number = Part::generate_display_part_number(
-            db_manager.connection(),
+            &conn,
             "Electronic",
             "Resistor",
             10001
@@ -522,7 +625,7 @@ mod tests {
 
         // Test with custom category/subcategory
         let display_number = Part::generate_display_part_number(
-            db_manager.connection(),
+            &conn,
             "Custom Category",
             "Custom Subcategory",
             10042

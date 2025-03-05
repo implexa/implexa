@@ -5,6 +5,7 @@
 //! implementation, connection management, and operations for interacting with the database.
 
 pub mod schema;
+pub mod connection_manager;
 pub mod part;
 pub mod revision;
 pub mod relationship;
@@ -17,6 +18,7 @@ pub mod category;
 pub mod part_management;
 
 pub use schema::{DatabaseManager, DatabaseError, DatabaseResult};
+pub use connection_manager::ConnectionManager;
 pub use part::{Part, PartManager};
 pub use revision::{Revision, RevisionStatus, RevisionManager};
 pub use relationship::{Relationship, RelationshipType, RelationshipManager};

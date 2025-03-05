@@ -6,6 +6,7 @@
 use rusqlite::{Connection, Error as SqliteError, params};
 use std::path::Path;
 use thiserror::Error;
+use crate::database::connection_manager::ConnectionManager;
 
 /// Errors that can occur during database operations
 #[derive(Error, Debug)]
@@ -34,8 +35,8 @@ pub type DatabaseResult<T> = std::result::Result<T, DatabaseError>;
 ///
 /// This struct provides methods for initializing and interacting with the SQLite database.
 pub struct DatabaseManager {
-    /// Connection to the SQLite database
-    connection: Connection,
+    /// Connection manager for the SQLite database
+    connection_manager: ConnectionManager,
 }
 
 impl DatabaseManager {
@@ -54,7 +55,9 @@ impl DatabaseManager {
     /// Returns a DatabaseError if the connection cannot be established
     pub fn new<P: AsRef<Path>>(db_path: P) -> DatabaseResult<Self> {
         let connection = Connection::open(db_path)?;
-        Ok(Self { connection })
+        Ok(Self {
+            connection_manager: ConnectionManager::new(connection),
+        })
     }
 
     /// Initialize the database schema
@@ -69,9 +72,9 @@ impl DatabaseManager {
     /// # Errors
     ///
     /// Returns a DatabaseError if the schema initialization fails
-    pub fn initialize_schema(&mut self) -> DatabaseResult<()> {
+    pub fn initialize_schema(&self) -> DatabaseResult<()> {
         // Use a transaction to ensure all schema changes are atomic
-        let tx = self.connection.transaction()?;
+        self.connection_manager.transaction(|tx| {
 
         // Create SchemaVersion table
         tx.execute(
@@ -380,10 +383,14 @@ impl DatabaseManager {
             [],
         )?;
 
-        // Commit the transaction
-        tx.commit()?;
-
-        Ok(())
+            // Insert initial schema version
+            tx.execute(
+                "INSERT INTO SchemaVersion (version, description) VALUES (1, 'Initial schema creation')",
+                [],
+            )?;
+            
+            Ok(())
+        }).map_err(|e| e.into())
     }
 
     /// Get the current schema version
@@ -396,21 +403,23 @@ impl DatabaseManager {
     ///
     /// Returns a DatabaseError if the version cannot be retrieved
     pub fn get_schema_version(&self) -> DatabaseResult<i64> {
-        let version = self.connection.query_row(
-            "SELECT MAX(version) FROM SchemaVersion",
-            [],
-            |row| row.get(0),
-        )?;
-        Ok(version)
+        self.connection_manager.execute(|conn| {
+            let version = conn.query_row(
+                "SELECT MAX(version) FROM SchemaVersion",
+                [],
+                |row| row.get(0),
+            )?;
+            Ok(version)
+        }).map_err(|e| e.into())
     }
 
-    /// Get a mutable reference to the underlying SQLite connection
+    /// Get a reference to the connection manager
     ///
     /// # Returns
     ///
-    /// A mutable reference to the SQLite connection
-    pub fn connection(&mut self) -> &mut Connection {
-        &mut self.connection
+    /// A reference to the connection manager
+    pub fn connection_manager(&self) -> &ConnectionManager {
+        &self.connection_manager
     }
 }
 
@@ -426,7 +435,7 @@ mod tests {
         let db_path = temp_dir.path().join("test.db");
 
         // Create a new database manager
-        let mut db_manager = DatabaseManager::new(&db_path).unwrap();
+        let db_manager = DatabaseManager::new(&db_path).unwrap();
 
         // Initialize the schema
         let result = db_manager.initialize_schema();
@@ -438,12 +447,16 @@ mod tests {
 
         // Check that all tables were created
         let tables = db_manager
-            .connection()
-            .prepare("SELECT name FROM sqlite_master WHERE type='table'")
-            .unwrap()
-            .query_map([], |row| row.get::<_, String>(0))
-            .unwrap()
-            .collect::<Result<Vec<_>, _>>()
+            .connection_manager()
+            .execute(|conn| {
+                let mut stmt = conn.prepare("SELECT name FROM sqlite_master WHERE type='table'")?;
+                let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+                let mut tables = Vec::new();
+                for row_result in rows {
+                    tables.push(row_result?);
+                }
+                Ok(tables)
+            })
             .unwrap();
 
         // Check that all expected tables exist

@@ -2,8 +2,9 @@
 //!
 //! This module provides functionality for managing relationships between parts in the database.
 
-use rusqlite::{Connection, params, Row, Result as SqliteResult};
+use rusqlite::{Connection, Transaction, params, Row, Result as SqliteResult};
 use crate::database::schema::{DatabaseError, DatabaseResult};
+use crate::database::connection_manager::ConnectionManager;
 
 /// Type of relationship between parts
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -102,8 +103,8 @@ impl Relationship {
 
 /// Manager for relationship operations
 pub struct RelationshipManager<'a> {
-    /// Connection to the SQLite database
-    connection: &'a Connection,
+    /// Connection manager for the SQLite database
+    connection_manager: &'a ConnectionManager,
 }
 
 impl<'a> RelationshipManager<'a> {
@@ -111,13 +112,30 @@ impl<'a> RelationshipManager<'a> {
     ///
     /// # Arguments
     ///
-    /// * `connection` - Connection to the SQLite database
+    /// * `connection_manager` - Connection manager for the SQLite database
     ///
     /// # Returns
     ///
     /// A new RelationshipManager instance
-    pub fn new(connection: &'a Connection) -> Self {
-        Self { connection }
+    pub fn new(connection_manager: &'a ConnectionManager) -> Self {
+        Self { connection_manager }
+    }
+    
+    /// Create a new RelationshipManager with a transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `transaction` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// A new RelationshipManager instance
+    ///
+    /// # Note
+    ///
+    /// This is a temporary method for backward compatibility during migration
+    pub fn new_with_transaction(_transaction: &'a Transaction) -> Self {
+        unimplemented!("This method is a placeholder for backward compatibility during migration")
     }
 
     /// Create a new relationship in the database
@@ -134,7 +152,37 @@ impl<'a> RelationshipManager<'a> {
     ///
     /// Returns a DatabaseError if the relationship could not be created
     pub fn create_relationship(&self, relationship: &Relationship) -> DatabaseResult<i64> {
-        self.connection.execute(
+        self.connection_manager.execute_mut(|conn| {
+            conn.execute(
+                "INSERT INTO Relationships (parent_part_id, child_part_id, type, quantity)
+                 VALUES (?1, ?2, ?3, ?4)",
+                params![
+                    relationship.parent_part_id,
+                    relationship.child_part_id,
+                    relationship.relationship_type.to_str(),
+                    relationship.quantity,
+                ],
+            )?;
+            Ok(conn.last_insert_rowid())
+        }).map_err(DatabaseError::from)
+    }
+    
+    /// Create a new relationship in the database within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `relationship` - The relationship to create
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// The ID of the newly created relationship
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the relationship could not be created
+    pub fn create_relationship_in_transaction(&self, relationship: &Relationship, tx: &Transaction) -> DatabaseResult<i64> {
+        tx.execute(
             "INSERT INTO Relationships (parent_part_id, child_part_id, type, quantity)
              VALUES (?1, ?2, ?3, ?4)",
             params![
@@ -144,7 +192,7 @@ impl<'a> RelationshipManager<'a> {
                 relationship.quantity,
             ],
         )?;
-        Ok(self.connection.last_insert_rowid())
+        Ok(tx.last_insert_rowid())
     }
 
     /// Get a relationship by its ID
@@ -161,14 +209,16 @@ impl<'a> RelationshipManager<'a> {
     ///
     /// Returns a DatabaseError if the relationship could not be found
     pub fn get_relationship(&self, relationship_id: i64) -> DatabaseResult<Relationship> {
-        let relationship = self.connection.query_row(
-            "SELECT relationship_id, parent_part_id, child_part_id, type, quantity
-             FROM Relationships
-             WHERE relationship_id = ?1",
-            params![relationship_id],
-            |row| self.row_to_relationship(row),
-        )?;
-        Ok(relationship)
+        self.connection_manager.execute(|conn| {
+            let relationship = conn.query_row(
+                "SELECT relationship_id, parent_part_id, child_part_id, type, quantity
+                 FROM Relationships
+                 WHERE relationship_id = ?1",
+                params![relationship_id],
+                |row| self.row_to_relationship(row),
+            )?;
+            Ok(relationship)
+        }).map_err(DatabaseError::from)
     }
 
     /// Get all relationships where the specified part is the parent
@@ -185,17 +235,19 @@ impl<'a> RelationshipManager<'a> {
     ///
     /// Returns a DatabaseError if the relationships could not be retrieved
     pub fn get_child_relationships(&self, part_id: &str) -> DatabaseResult<Vec<Relationship>> {
-        let mut stmt = self.connection.prepare(
-            "SELECT relationship_id, parent_part_id, child_part_id, type, quantity
-             FROM Relationships
-             WHERE parent_part_id = ?1",
-        )?;
-        let relationships_iter = stmt.query_map(params![part_id], |row| self.row_to_relationship(row))?;
-        let mut relationships = Vec::new();
-        for relationship_result in relationships_iter {
-            relationships.push(relationship_result?);
-        }
-        Ok(relationships)
+        self.connection_manager.execute(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT relationship_id, parent_part_id, child_part_id, type, quantity
+                 FROM Relationships
+                 WHERE parent_part_id = ?1",
+            )?;
+            let relationships_iter = stmt.query_map(params![part_id], |row| self.row_to_relationship(row))?;
+            let mut relationships = Vec::new();
+            for relationship_result in relationships_iter {
+                relationships.push(relationship_result?);
+            }
+            Ok(relationships)
+        }).map_err(DatabaseError::from)
     }
 
     /// Get all relationships where the specified part is the child
@@ -212,17 +264,19 @@ impl<'a> RelationshipManager<'a> {
     ///
     /// Returns a DatabaseError if the relationships could not be retrieved
     pub fn get_parent_relationships(&self, part_id: &str) -> DatabaseResult<Vec<Relationship>> {
-        let mut stmt = self.connection.prepare(
-            "SELECT relationship_id, parent_part_id, child_part_id, type, quantity
-             FROM Relationships
-             WHERE child_part_id = ?1",
-        )?;
-        let relationships_iter = stmt.query_map(params![part_id], |row| self.row_to_relationship(row))?;
-        let mut relationships = Vec::new();
-        for relationship_result in relationships_iter {
-            relationships.push(relationship_result?);
-        }
-        Ok(relationships)
+        self.connection_manager.execute(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT relationship_id, parent_part_id, child_part_id, type, quantity
+                 FROM Relationships
+                 WHERE child_part_id = ?1",
+            )?;
+            let relationships_iter = stmt.query_map(params![part_id], |row| self.row_to_relationship(row))?;
+            let mut relationships = Vec::new();
+            for relationship_result in relationships_iter {
+                relationships.push(relationship_result?);
+            }
+            Ok(relationships)
+        }).map_err(DatabaseError::from)
     }
 
     /// Update a relationship
@@ -243,19 +297,21 @@ impl<'a> RelationshipManager<'a> {
             DatabaseError::InitializationError("Relationship ID is required for update".to_string())
         })?;
 
-        self.connection.execute(
-            "UPDATE Relationships
-             SET parent_part_id = ?2, child_part_id = ?3, type = ?4, quantity = ?5
-             WHERE relationship_id = ?1",
-            params![
-                relationship_id,
-                relationship.parent_part_id,
-                relationship.child_part_id,
-                relationship.relationship_type.to_str(),
-                relationship.quantity,
-            ],
-        )?;
-        Ok(())
+        self.connection_manager.execute_mut(|conn| {
+            conn.execute(
+                "UPDATE Relationships
+                 SET parent_part_id = ?2, child_part_id = ?3, type = ?4, quantity = ?5
+                 WHERE relationship_id = ?1",
+                params![
+                    relationship_id,
+                    relationship.parent_part_id,
+                    relationship.child_part_id,
+                    relationship.relationship_type.to_str(),
+                    relationship.quantity,
+                ],
+            )?;
+            Ok(())
+        }).map_err(DatabaseError::from)
     }
 
     /// Delete a relationship
@@ -272,11 +328,13 @@ impl<'a> RelationshipManager<'a> {
     ///
     /// Returns a DatabaseError if the relationship could not be deleted
     pub fn delete_relationship(&self, relationship_id: i64) -> DatabaseResult<()> {
-        self.connection.execute(
-            "DELETE FROM Relationships WHERE relationship_id = ?1",
-            params![relationship_id],
-        )?;
-        Ok(())
+        self.connection_manager.execute_mut(|conn| {
+            conn.execute(
+                "DELETE FROM Relationships WHERE relationship_id = ?1",
+                params![relationship_id],
+            )?;
+            Ok(())
+        }).map_err(DatabaseError::from)
     }
 
     /// Get the bill of materials (BOM) for a part
@@ -293,26 +351,28 @@ impl<'a> RelationshipManager<'a> {
     ///
     /// Returns a DatabaseError if the BOM could not be retrieved
     pub fn get_bom(&self, part_id: &str) -> DatabaseResult<Vec<(String, String, String, String, i64)>> {
-        let mut stmt = self.connection.prepare(
-            "SELECT p.part_id, p.name, p.category, p.subcategory, r.quantity
-             FROM Parts p
-             JOIN Relationships r ON p.part_id = r.child_part_id
-             WHERE r.parent_part_id = ?1 AND r.type = 'Assembly'",
-        )?;
-        let bom_iter = stmt.query_map(params![part_id], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, i64>(4)?,
-            ))
-        })?;
-        let mut bom = Vec::new();
-        for bom_result in bom_iter {
-            bom.push(bom_result?);
-        }
-        Ok(bom)
+        self.connection_manager.execute(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT p.part_id, p.name, p.category, p.subcategory, r.quantity
+                 FROM Parts p
+                 JOIN Relationships r ON p.part_id = r.child_part_id
+                 WHERE r.parent_part_id = ?1 AND r.type = 'Assembly'",
+            )?;
+            let bom_iter = stmt.query_map(params![part_id], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, i64>(4)?,
+                ))
+            })?;
+            let mut bom = Vec::new();
+            for bom_result in bom_iter {
+                bom.push(bom_result?);
+            }
+            Ok(bom)
+        }).map_err(DatabaseError::from)
     }
 
     /// Convert a database row to a Relationship
@@ -356,12 +416,12 @@ mod tests {
         let db_path = temp_dir.path().join("test.db");
 
         // Create a new database manager and initialize the schema
-        let mut db_manager = DatabaseManager::new(&db_path).unwrap();
+        let db_manager = DatabaseManager::new(&db_path).unwrap();
         db_manager.initialize_schema().unwrap();
 
         // Create a part manager and a relationship manager
-        let mut part_manager = PartManager::new(db_manager.connection());
-        let relationship_manager = RelationshipManager::new(db_manager.connection());
+        let part_manager = PartManager::new(db_manager.connection_manager());
+        let relationship_manager = RelationshipManager::new(db_manager.connection_manager());
 
         // Create two parts
         let parent_part = Part::new(

@@ -11,6 +11,7 @@ This index provides a categorized list of all documentation in the memory bank f
 ## Architecture Documentation
 - [Git Backend Architecture](./git-backend-architecture.md) - Design of the Git backend component
 - [Database Schema Design](./database-schema-design.md) - SQLite database schema design
+- [Database Connection Refactoring Guide](./database-connection-refactoring-guide.md) - Guide for refactoring database connection management
 - [Part Management Workflow](./part-management-workflow.md) - Part lifecycle workflow design
 - [User Interface Architecture](./user-interface-architecture.md) - UI design and components
 - [Directory Structure](./directory-structure.md) - File and directory organization

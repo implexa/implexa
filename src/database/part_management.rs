@@ -129,8 +129,8 @@ impl User {
 
 /// Manager for part management operations
 pub struct PartManagementManager<'a> {
-    /// Connection to the SQLite database
-    connection: &'a mut Connection,
+    /// Connection manager for the SQLite database
+    connection_manager: &'a ConnectionManager,
     /// Git backend manager
     git_manager: &'a GitBackendManager,
     /// Current user
@@ -142,7 +142,7 @@ impl<'a> PartManagementManager<'a> {
     ///
     /// # Arguments
     ///
-    /// * `connection` - Mutable connection to the SQLite database
+    /// * `connection_manager` - Connection manager for the SQLite database
     /// * `git_manager` - Git backend manager
     /// * `current_user` - Current user
     ///
@@ -150,12 +150,12 @@ impl<'a> PartManagementManager<'a> {
     ///
     /// A new PartManagementManager instance
     pub fn new(
-        connection: &'a mut Connection,
+        connection_manager: &'a ConnectionManager,
         git_manager: &'a GitBackendManager,
         current_user: User,
     ) -> Self {
         Self {
-            connection,
+            connection_manager,
             git_manager,
             current_user,
         }

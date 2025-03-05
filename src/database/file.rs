@@ -2,9 +2,10 @@
 //!
 //! This module provides functionality for managing files associated with parts and revisions in the database.
 
-use rusqlite::{Connection, params, Row, Result as SqliteResult};
+use rusqlite::{Connection, Transaction, params, Row, Result as SqliteResult};
 use std::path::PathBuf;
 use crate::database::schema::{DatabaseError, DatabaseResult};
+use crate::database::connection_manager::ConnectionManager;
 
 /// Type of file
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -146,8 +147,8 @@ impl File {
 
 /// Manager for file operations
 pub struct FileManager<'a> {
-    /// Connection to the SQLite database
-    connection: &'a Connection,
+    /// Connection manager for the SQLite database
+    connection_manager: &'a ConnectionManager,
 }
 
 impl<'a> FileManager<'a> {
@@ -155,13 +156,30 @@ impl<'a> FileManager<'a> {
     ///
     /// # Arguments
     ///
-    /// * `connection` - Connection to the SQLite database
+    /// * `connection_manager` - Connection manager for the SQLite database
     ///
     /// # Returns
     ///
     /// A new FileManager instance
-    pub fn new(connection: &'a Connection) -> Self {
-        Self { connection }
+    pub fn new(connection_manager: &'a ConnectionManager) -> Self {
+        Self { connection_manager }
+    }
+    
+    /// Create a new FileManager with a transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `transaction` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// A new FileManager instance
+    ///
+    /// # Note
+    ///
+    /// This is a temporary method for backward compatibility during migration
+    pub fn new_with_transaction(_transaction: &'a Transaction) -> Self {
+        unimplemented!("This method is a placeholder for backward compatibility during migration")
     }
 
     /// Create a new file in the database
@@ -178,7 +196,38 @@ impl<'a> FileManager<'a> {
     ///
     /// Returns a DatabaseError if the file could not be created
     pub fn create_file(&self, file: &File) -> DatabaseResult<i64> {
-        self.connection.execute(
+        self.connection_manager.execute_mut(|conn| {
+            conn.execute(
+                "INSERT INTO Files (part_id, revision_id, path, type, description)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![
+                    file.part_id,
+                    file.revision_id,
+                    file.path.to_string_lossy().to_string(),
+                    file.file_type.to_str(),
+                    file.description,
+                ],
+            )?;
+            Ok(conn.last_insert_rowid())
+        }).map_err(DatabaseError::from)
+    }
+    
+    /// Create a new file in the database within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `file` - The file to create
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// The ID of the newly created file
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the file could not be created
+    pub fn create_file_in_transaction(&self, file: &File, tx: &Transaction) -> DatabaseResult<i64> {
+        tx.execute(
             "INSERT INTO Files (part_id, revision_id, path, type, description)
              VALUES (?1, ?2, ?3, ?4, ?5)",
             params![
@@ -189,7 +238,7 @@ impl<'a> FileManager<'a> {
                 file.description,
             ],
         )?;
-        Ok(self.connection.last_insert_rowid())
+        Ok(tx.last_insert_rowid())
     }
 
     /// Get a file by its ID
@@ -206,14 +255,16 @@ impl<'a> FileManager<'a> {
     ///
     /// Returns a DatabaseError if the file could not be found
     pub fn get_file(&self, file_id: i64) -> DatabaseResult<File> {
-        let file = self.connection.query_row(
-            "SELECT file_id, part_id, revision_id, path, type, description
-             FROM Files
-             WHERE file_id = ?1",
-            params![file_id],
-            |row| self.row_to_file(row),
-        )?;
-        Ok(file)
+        self.connection_manager.execute(|conn| {
+            let file = conn.query_row(
+                "SELECT file_id, part_id, revision_id, path, type, description
+                 FROM Files
+                 WHERE file_id = ?1",
+                params![file_id],
+                |row| self.row_to_file(row),
+            )?;
+            Ok(file)
+        }).map_err(DatabaseError::from)
     }
 
     /// Get all files for a part
@@ -230,18 +281,20 @@ impl<'a> FileManager<'a> {
     ///
     /// Returns a DatabaseError if the files could not be retrieved
     pub fn get_part_files(&self, part_id: &str) -> DatabaseResult<Vec<File>> {
-        let mut stmt = self.connection.prepare(
-            "SELECT file_id, part_id, revision_id, path, type, description
-             FROM Files
-             WHERE part_id = ?1
-             ORDER BY type, path",
-        )?;
-        let files_iter = stmt.query_map(params![part_id], |row| self.row_to_file(row))?;
-        let mut files = Vec::new();
-        for file_result in files_iter {
-            files.push(file_result?);
-        }
-        Ok(files)
+        self.connection_manager.execute(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT file_id, part_id, revision_id, path, type, description
+                 FROM Files
+                 WHERE part_id = ?1
+                 ORDER BY type, path",
+            )?;
+            let files_iter = stmt.query_map(params![part_id], |row| self.row_to_file(row))?;
+            let mut files = Vec::new();
+            for file_result in files_iter {
+                files.push(file_result?);
+            }
+            Ok(files)
+        }).map_err(DatabaseError::from)
     }
 
     /// Get all files for a revision
@@ -258,18 +311,20 @@ impl<'a> FileManager<'a> {
     ///
     /// Returns a DatabaseError if the files could not be retrieved
     pub fn get_revision_files(&self, revision_id: i64) -> DatabaseResult<Vec<File>> {
-        let mut stmt = self.connection.prepare(
-            "SELECT file_id, part_id, revision_id, path, type, description
-             FROM Files
-             WHERE revision_id = ?1
-             ORDER BY type, path",
-        )?;
-        let files_iter = stmt.query_map(params![revision_id], |row| self.row_to_file(row))?;
-        let mut files = Vec::new();
-        for file_result in files_iter {
-            files.push(file_result?);
-        }
-        Ok(files)
+        self.connection_manager.execute(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT file_id, part_id, revision_id, path, type, description
+                 FROM Files
+                 WHERE revision_id = ?1
+                 ORDER BY type, path",
+            )?;
+            let files_iter = stmt.query_map(params![revision_id], |row| self.row_to_file(row))?;
+            let mut files = Vec::new();
+            for file_result in files_iter {
+                files.push(file_result?);
+            }
+            Ok(files)
+        }).map_err(DatabaseError::from)
     }
 
     /// Get files by type for a part
@@ -287,18 +342,20 @@ impl<'a> FileManager<'a> {
     ///
     /// Returns a DatabaseError if the files could not be retrieved
     pub fn get_part_files_by_type(&self, part_id: &str, file_type: &FileType) -> DatabaseResult<Vec<File>> {
-        let mut stmt = self.connection.prepare(
-            "SELECT file_id, part_id, revision_id, path, type, description
-             FROM Files
-             WHERE part_id = ?1 AND type = ?2
-             ORDER BY path",
-        )?;
-        let files_iter = stmt.query_map(params![part_id, file_type.to_str()], |row| self.row_to_file(row))?;
-        let mut files = Vec::new();
-        for file_result in files_iter {
-            files.push(file_result?);
-        }
-        Ok(files)
+        self.connection_manager.execute(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT file_id, part_id, revision_id, path, type, description
+                 FROM Files
+                 WHERE part_id = ?1 AND type = ?2
+                 ORDER BY path",
+            )?;
+            let files_iter = stmt.query_map(params![part_id, file_type.to_str()], |row| self.row_to_file(row))?;
+            let mut files = Vec::new();
+            for file_result in files_iter {
+                files.push(file_result?);
+            }
+            Ok(files)
+        }).map_err(DatabaseError::from)
     }
 
     /// Get files by type for a revision
@@ -316,18 +373,20 @@ impl<'a> FileManager<'a> {
     ///
     /// Returns a DatabaseError if the files could not be retrieved
     pub fn get_revision_files_by_type(&self, revision_id: i64, file_type: &FileType) -> DatabaseResult<Vec<File>> {
-        let mut stmt = self.connection.prepare(
-            "SELECT file_id, part_id, revision_id, path, type, description
-             FROM Files
-             WHERE revision_id = ?1 AND type = ?2
-             ORDER BY path",
-        )?;
-        let files_iter = stmt.query_map(params![revision_id, file_type.to_str()], |row| self.row_to_file(row))?;
-        let mut files = Vec::new();
-        for file_result in files_iter {
-            files.push(file_result?);
-        }
-        Ok(files)
+        self.connection_manager.execute(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT file_id, part_id, revision_id, path, type, description
+                 FROM Files
+                 WHERE revision_id = ?1 AND type = ?2
+                 ORDER BY path",
+            )?;
+            let files_iter = stmt.query_map(params![revision_id, file_type.to_str()], |row| self.row_to_file(row))?;
+            let mut files = Vec::new();
+            for file_result in files_iter {
+                files.push(file_result?);
+            }
+            Ok(files)
+        }).map_err(DatabaseError::from)
     }
 
     /// Update a file
@@ -348,7 +407,44 @@ impl<'a> FileManager<'a> {
             DatabaseError::InitializationError("File ID is required for update".to_string())
         })?;
 
-        self.connection.execute(
+        self.connection_manager.execute_mut(|conn| {
+            conn.execute(
+                "UPDATE Files
+                 SET part_id = ?2, revision_id = ?3, path = ?4, type = ?5, description = ?6
+                 WHERE file_id = ?1",
+                params![
+                    file_id,
+                    file.part_id,
+                    file.revision_id,
+                    file.path.to_string_lossy().to_string(),
+                    file.file_type.to_str(),
+                    file.description,
+                ],
+            )?;
+            Ok(())
+        }).map_err(DatabaseError::from)
+    }
+    
+    /// Update a file within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `file` - The file to update
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// Ok(()) if the file was successfully updated
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the file could not be updated
+    pub fn update_file_in_transaction(&self, file: &File, tx: &Transaction) -> DatabaseResult<()> {
+        let file_id = file.file_id.ok_or_else(|| {
+            DatabaseError::InitializationError("File ID is required for update".to_string())
+        })?;
+
+        tx.execute(
             "UPDATE Files
              SET part_id = ?2, revision_id = ?3, path = ?4, type = ?5, description = ?6
              WHERE file_id = ?1",
@@ -378,7 +474,31 @@ impl<'a> FileManager<'a> {
     ///
     /// Returns a DatabaseError if the file could not be deleted
     pub fn delete_file(&self, file_id: i64) -> DatabaseResult<()> {
-        self.connection.execute(
+        self.connection_manager.execute_mut(|conn| {
+            conn.execute(
+                "DELETE FROM Files WHERE file_id = ?1",
+                params![file_id],
+            )?;
+            Ok(())
+        }).map_err(DatabaseError::from)
+    }
+    
+    /// Delete a file within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `file_id` - The ID of the file to delete
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// Ok(()) if the file was successfully deleted
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the file could not be deleted
+    pub fn delete_file_in_transaction(&self, file_id: i64, tx: &Transaction) -> DatabaseResult<()> {
+        tx.execute(
             "DELETE FROM Files WHERE file_id = ?1",
             params![file_id],
         )?;
@@ -431,12 +551,12 @@ mod tests {
         let db_path = temp_dir.path().join("test.db");
 
         // Create a new database manager and initialize the schema
-        let mut db_manager = DatabaseManager::new(&db_path).unwrap();
+        let db_manager = DatabaseManager::new(&db_path).unwrap();
         db_manager.initialize_schema().unwrap();
 
         // Create managers
-        let part_manager = PartManager::new(db_manager.connection());
-        let file_manager = FileManager::new(db_manager.connection());
+        let part_manager = PartManager::new(db_manager.connection_manager());
+        let file_manager = FileManager::new(db_manager.connection_manager());
 
         // Create a new part
         let part = Part::new(
@@ -478,13 +598,13 @@ mod tests {
         let db_path = temp_dir.path().join("test.db");
 
         // Create a new database manager and initialize the schema
-        let mut db_manager = DatabaseManager::new(&db_path).unwrap();
+        let db_manager = DatabaseManager::new(&db_path).unwrap();
         db_manager.initialize_schema().unwrap();
 
         // Create managers
-        let part_manager = PartManager::new(db_manager.connection());
-        let revision_manager = RevisionManager::new(db_manager.connection());
-        let file_manager = FileManager::new(db_manager.connection());
+        let part_manager = PartManager::new(db_manager.connection_manager());
+        let revision_manager = RevisionManager::new(db_manager.connection_manager());
+        let file_manager = FileManager::new(db_manager.connection_manager());
 
         // Create a new part
         let part = Part::new(

@@ -2,9 +2,10 @@
 //!
 //! This module provides functionality for managing approvals of revisions in the database.
 
-use rusqlite::{Connection, params, Row, Result as SqliteResult};
+use rusqlite::{Connection, Transaction, params, Row, Result as SqliteResult};
 use std::time::{SystemTime, UNIX_EPOCH};
-use crate::database::schema::DatabaseResult;
+use crate::database::schema::{DatabaseResult, DatabaseError};
+use crate::database::connection_manager::ConnectionManager;
 
 /// Status of an approval
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -105,8 +106,8 @@ impl Approval {
 
 /// Manager for approval operations
 pub struct ApprovalManager<'a> {
-    /// Connection to the SQLite database
-    connection: &'a Connection,
+    /// Connection manager for the SQLite database
+    connection_manager: &'a ConnectionManager,
 }
 
 impl<'a> ApprovalManager<'a> {
@@ -114,13 +115,30 @@ impl<'a> ApprovalManager<'a> {
     ///
     /// # Arguments
     ///
-    /// * `connection` - Connection to the SQLite database
+    /// * `connection_manager` - Connection manager for the SQLite database
     ///
     /// # Returns
     ///
     /// A new ApprovalManager instance
-    pub fn new(connection: &'a Connection) -> Self {
-        Self { connection }
+    pub fn new(connection_manager: &'a ConnectionManager) -> Self {
+        Self { connection_manager }
+    }
+    
+    /// Create a new ApprovalManager with a transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `transaction` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// A new ApprovalManager instance
+    ///
+    /// # Note
+    ///
+    /// This is a temporary method for backward compatibility during migration
+    pub fn new_with_transaction(_transaction: &'a Transaction) -> Self {
+        unimplemented!("This method is a placeholder for backward compatibility during migration")
     }
 
     /// Create a new approval in the database
@@ -137,6 +155,44 @@ impl<'a> ApprovalManager<'a> {
     ///
     /// Returns a DatabaseError if the approval could not be created
     pub fn create_approval(&self, approval: &Approval) -> DatabaseResult<i64> {
+        self.connection_manager.execute_mut(|conn| {
+            // Convert SystemTime to seconds since UNIX_EPOCH for SQLite
+            let date_secs = approval.date.map(|d| {
+                d.duration_since(UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs() as i64
+            });
+            
+            conn.execute(
+                "INSERT INTO Approvals (revision_id, approver, status, date, comments)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![
+                    approval.revision_id,
+                    approval.approver,
+                    approval.status.to_str(),
+                    date_secs,
+                    approval.comments,
+                ],
+            )?;
+            Ok(conn.last_insert_rowid())
+        }).map_err(DatabaseError::from)
+    }
+    
+    /// Create a new approval in the database within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `approval` - The approval to create
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// The ID of the newly created approval
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the approval could not be created
+    pub fn create_approval_in_transaction(&self, approval: &Approval, tx: &Transaction) -> DatabaseResult<i64> {
         // Convert SystemTime to seconds since UNIX_EPOCH for SQLite
         let date_secs = approval.date.map(|d| {
             d.duration_since(UNIX_EPOCH)
@@ -144,7 +200,7 @@ impl<'a> ApprovalManager<'a> {
                 .as_secs() as i64
         });
         
-        self.connection.execute(
+        tx.execute(
             "INSERT INTO Approvals (revision_id, approver, status, date, comments)
              VALUES (?1, ?2, ?3, ?4, ?5)",
             params![
@@ -155,7 +211,7 @@ impl<'a> ApprovalManager<'a> {
                 approval.comments,
             ],
         )?;
-        Ok(self.connection.last_insert_rowid())
+        Ok(tx.last_insert_rowid())
     }
 
     /// Get an approval by its ID
@@ -172,14 +228,16 @@ impl<'a> ApprovalManager<'a> {
     ///
     /// Returns a DatabaseError if the approval could not be found
     pub fn get_approval(&self, approval_id: i64) -> DatabaseResult<Approval> {
-        let approval = self.connection.query_row(
-            "SELECT approval_id, revision_id, approver, status, date, comments
-             FROM Approvals
-             WHERE approval_id = ?1",
-            params![approval_id],
-            |row| self.row_to_approval(row),
-        )?;
-        Ok(approval)
+        self.connection_manager.execute(|conn| {
+            let approval = conn.query_row(
+                "SELECT approval_id, revision_id, approver, status, date, comments
+                 FROM Approvals
+                 WHERE approval_id = ?1",
+                params![approval_id],
+                |row| self.row_to_approval(row),
+            )?;
+            Ok(approval)
+        }).map_err(DatabaseError::from)
     }
 
     /// Get all approvals for a revision
@@ -196,18 +254,20 @@ impl<'a> ApprovalManager<'a> {
     ///
     /// Returns a DatabaseError if the approvals could not be retrieved
     pub fn get_approvals_for_revision(&self, revision_id: i64) -> DatabaseResult<Vec<Approval>> {
-        let mut stmt = self.connection.prepare(
-            "SELECT approval_id, revision_id, approver, status, date, comments
-             FROM Approvals
-             WHERE revision_id = ?1
-             ORDER BY approver",
-        )?;
-        let approvals_iter = stmt.query_map(params![revision_id], |row| self.row_to_approval(row))?;
-        let mut approvals = Vec::new();
-        for approval_result in approvals_iter {
-            approvals.push(approval_result?);
-        }
-        Ok(approvals)
+        self.connection_manager.execute(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT approval_id, revision_id, approver, status, date, comments
+                 FROM Approvals
+                 WHERE revision_id = ?1
+                 ORDER BY approver",
+            )?;
+            let approvals_iter = stmt.query_map(params![revision_id], |row| self.row_to_approval(row))?;
+            let mut approvals = Vec::new();
+            for approval_result in approvals_iter {
+                approvals.push(approval_result?);
+            }
+            Ok(approvals)
+        }).map_err(DatabaseError::from)
     }
 
     /// Get an approval for a specific revision and approver
@@ -225,14 +285,16 @@ impl<'a> ApprovalManager<'a> {
     ///
     /// Returns a DatabaseError if the approval could not be found
     pub fn get_approval_for_revision_and_approver(&self, revision_id: i64, approver: &str) -> DatabaseResult<Approval> {
-        let approval = self.connection.query_row(
-            "SELECT approval_id, revision_id, approver, status, date, comments
-             FROM Approvals
-             WHERE revision_id = ?1 AND approver = ?2",
-            params![revision_id, approver],
-            |row| self.row_to_approval(row),
-        )?;
-        Ok(approval)
+        self.connection_manager.execute(|conn| {
+            let approval = conn.query_row(
+                "SELECT approval_id, revision_id, approver, status, date, comments
+                 FROM Approvals
+                 WHERE revision_id = ?1 AND approver = ?2",
+                params![revision_id, approver],
+                |row| self.row_to_approval(row),
+            )?;
+            Ok(approval)
+        }).map_err(DatabaseError::from)
     }
 
     /// Update the status of an approval
@@ -251,6 +313,52 @@ impl<'a> ApprovalManager<'a> {
     ///
     /// Returns a DatabaseError if the status could not be updated
     pub fn update_status(&self, approval_id: i64, status: ApprovalStatus, comments: Option<&str>) -> DatabaseResult<()> {
+        self.connection_manager.execute_mut(|conn| {
+            let date = if status == ApprovalStatus::Pending {
+                None
+            } else {
+                Some(SystemTime::now())
+            };
+
+            // Convert SystemTime to seconds since UNIX_EPOCH for SQLite
+            let date_secs = date.map(|d| {
+                d.duration_since(UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs() as i64
+            });
+
+            conn.execute(
+                "UPDATE Approvals
+                 SET status = ?2, date = ?3, comments = ?4
+                 WHERE approval_id = ?1",
+                params![
+                    approval_id,
+                    status.to_str(),
+                    date_secs,
+                    comments,
+                ],
+            )?;
+            Ok(())
+        }).map_err(DatabaseError::from)
+    }
+    
+    /// Update the status of an approval within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `approval_id` - The ID of the approval
+    /// * `status` - The new status
+    /// * `comments` - Comments from the approver
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// Ok(()) if the status was successfully updated
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the status could not be updated
+    pub fn update_status_in_transaction(&self, approval_id: i64, status: ApprovalStatus, comments: Option<&str>, tx: &Transaction) -> DatabaseResult<()> {
         let date = if status == ApprovalStatus::Pending {
             None
         } else {
@@ -264,7 +372,7 @@ impl<'a> ApprovalManager<'a> {
                 .as_secs() as i64
         });
 
-        self.connection.execute(
+        tx.execute(
             "UPDATE Approvals
              SET status = ?2, date = ?3, comments = ?4
              WHERE approval_id = ?1",
@@ -292,7 +400,31 @@ impl<'a> ApprovalManager<'a> {
     ///
     /// Returns a DatabaseError if the approval could not be deleted
     pub fn delete_approval(&self, approval_id: i64) -> DatabaseResult<()> {
-        self.connection.execute(
+        self.connection_manager.execute_mut(|conn| {
+            conn.execute(
+                "DELETE FROM Approvals WHERE approval_id = ?1",
+                params![approval_id],
+            )?;
+            Ok(())
+        }).map_err(DatabaseError::from)
+    }
+    
+    /// Delete an approval within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `approval_id` - The ID of the approval to delete
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// Ok(()) if the approval was successfully deleted
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the approval could not be deleted
+    pub fn delete_approval_in_transaction(&self, approval_id: i64, tx: &Transaction) -> DatabaseResult<()> {
+        tx.execute(
             "DELETE FROM Approvals WHERE approval_id = ?1",
             params![approval_id],
         )?;
@@ -378,13 +510,13 @@ mod tests {
         let db_path = temp_dir.path().join("test.db");
 
         // Create a new database manager and initialize the schema
-        let mut db_manager = DatabaseManager::new(&db_path).unwrap();
+        let db_manager = DatabaseManager::new(&db_path).unwrap();
         db_manager.initialize_schema().unwrap();
 
         // Create managers
-        let part_manager = PartManager::new(db_manager.connection());
-        let revision_manager = RevisionManager::new(db_manager.connection());
-        let approval_manager = ApprovalManager::new(db_manager.connection());
+        let part_manager = PartManager::new(db_manager.connection_manager());
+        let revision_manager = RevisionManager::new(db_manager.connection_manager());
+        let approval_manager = ApprovalManager::new(db_manager.connection_manager());
 
         // Create a new part
         let part = Part::new(
@@ -438,13 +570,13 @@ mod tests {
         let db_path = temp_dir.path().join("test.db");
 
         // Create a new database manager and initialize the schema
-        let mut db_manager = DatabaseManager::new(&db_path).unwrap();
+        let db_manager = DatabaseManager::new(&db_path).unwrap();
         db_manager.initialize_schema().unwrap();
 
         // Create managers
-        let part_manager = PartManager::new(db_manager.connection());
-        let revision_manager = RevisionManager::new(db_manager.connection());
-        let approval_manager = ApprovalManager::new(db_manager.connection());
+        let part_manager = PartManager::new(db_manager.connection_manager());
+        let revision_manager = RevisionManager::new(db_manager.connection_manager());
+        let approval_manager = ApprovalManager::new(db_manager.connection_manager());
 
         // Create a new part
         let part = Part::new(

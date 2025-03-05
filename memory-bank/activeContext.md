@@ -20,6 +20,8 @@ We've implemented the comprehensive solution for the database connection managem
   - `PartManager`
   - `RevisionManager`
   - `RelationshipManager`
+  - `PartManagementManager`
+  - `PropertyManager`
 - Added transaction-specific methods for backward compatibility
 - Updated tests to use the new approach
 - Added support for mocking in tests
@@ -30,6 +32,8 @@ We've implemented the comprehensive solution for the database connection managem
 - Added methods for executing read-only operations, mutable operations, and transactions
 - Created transaction-specific methods for compatibility with existing code
 - Updated all manager structs to use the `ConnectionManager` instead of direct connection references
+- Refactored the `PartManagementManager` to use the `ConnectionManager` for all database operations
+- Updated the test code to use the new approach
 
 ### 4. Benefits Achieved
 - Eliminated multiple mutable borrow issues through interior mutability
@@ -37,9 +41,10 @@ We've implemented the comprehensive solution for the database connection managem
 - Simplified transaction management
 - Improved testability with easier mocking
 - Maintained type safety and composability
+- Removed the need for mutable references to the connection in the `PartManagementManager`
+- Improved error handling with consistent error propagation
 
 ## Next Steps
-- Refactor the remaining manager structs to use the new approach
-- Update the PartManagementManager to use the ConnectionManager
+- Refactor the remaining manager structs to use the new approach (ApprovalManager, ManufacturerPartManager, FileManager, WorkflowManager, CategoryManager)
 - Verify that all tests pass with the new implementation
 - Update any remaining code that uses direct connection references

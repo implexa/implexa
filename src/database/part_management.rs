@@ -178,7 +178,7 @@ impl<'a> PartManagementManager<'a> {
     ///
     /// Returns a PartManagementError if the part could not be created
     pub fn create_part(
-        &mut self,
+        &self,
         category: String,
         subcategory: String,
         name: String,
@@ -192,47 +192,48 @@ impl<'a> PartManagementManager<'a> {
             ));
         }
         
-        // Start a transaction
-        let tx = self.connection.transaction()?;
-        
-        // Create part managers
-        let part_manager = PartManager::new(&tx);
-        let revision_manager = RevisionManager::new(&tx);
-        
-        // Create the part
-        let part = part_manager.create_new_part(
-            category,
-            subcategory,
-            name,
-            description,
-        )?;
-        
-        // Generate the display part number
-        let display_part_number = part.display_part_number(&tx);
-        
-        // Create a new revision in Draft state
-        let revision = Revision::new(
-            part.part_id.to_string(),
-            "1".to_string(),
-            RevisionStatus::Draft,
-            self.current_user.username.clone(),
-            None, // No commit hash yet
-        );
-        
-        // Save the revision to the database
-        let revision_id = revision_manager.create_revision(&revision)?;
-        
-        // Create a feature branch for the part
-        let branch_name = format!("part/{}/draft", display_part_number);
-        // Open the repository first
-        let repo = self.git_manager.open_repository(repo_path)?;
-        self.git_manager.create_branch(&repo, &branch_name)?;
-        self.git_manager.checkout_branch(&repo, &branch_name)?;
-        
-        // Commit the transaction
-        tx.commit()?;
-        
-        Ok((part, revision_id))
+        // Use a transaction for the entire operation
+        self.connection_manager.transaction(|tx| {
+            // Create part managers for this transaction
+            let part_manager = PartManager::new_with_transaction(tx);
+            let revision_manager = RevisionManager::new_with_transaction(tx);
+            
+            // Create the part
+            let part_id = part_manager.get_next_part_id_in_transaction(tx)?;
+            let part = Part::new(
+                part_id,
+                category,
+                subcategory,
+                name,
+                description,
+            );
+            
+            part_manager.create_part_in_transaction(&part, tx)?;
+            
+            // Generate the display part number
+            let display_part_number = part.display_part_number(tx);
+            
+            // Create a new revision in Draft state
+            let revision = Revision::new(
+                part.part_id.to_string(),
+                "1".to_string(),
+                RevisionStatus::Draft,
+                self.current_user.username.clone(),
+                None, // No commit hash yet
+            );
+            
+            // Save the revision to the database
+            let revision_id = revision_manager.create_revision_in_transaction(&revision, tx)?;
+            
+            // Create a feature branch for the part
+            let branch_name = format!("part/{}/draft", display_part_number);
+            // Open the repository first
+            let repo = self.git_manager.open_repository(repo_path)?;
+            self.git_manager.create_branch(&repo, &branch_name)?;
+            self.git_manager.checkout_branch(&repo, &branch_name)?;
+            
+            Ok((part, revision_id))
+        }).map_err(|e| e.into())
     }
     
     /// Submit a part for review
@@ -251,70 +252,66 @@ impl<'a> PartManagementManager<'a> {
     ///
     /// Returns a PartManagementError if the part could not be submitted for review
     pub fn submit_for_review(
-        &mut self,
+        &self,
         revision_id: i64,
         repo_path: &Path,
         reviewers: Vec<String>,
     ) -> PartManagementResult<()> {
-        // Start a transaction
-        let tx = self.connection.transaction()?;
-        
-        // Create managers
-        let revision_manager = RevisionManager::new(&tx);
-        let approval_manager = ApprovalManager::new(&tx);
-        
-        // Get the revision
-        let revision = revision_manager.get_revision(revision_id)?;
-        
-        // Check if the user has permission to submit the part for review
-        if !self.current_user.can_edit_part(&revision.created_by) {
-            return Err(PartManagementError::PermissionDenied(
-                "User does not have permission to submit this part for review".to_string(),
-            ));
-        }
-        
-        // Check if the revision is in Draft state
-        if revision.status != RevisionStatus::Draft {
-            return Err(PartManagementError::InvalidStateTransition(
-                format!("Cannot submit revision for review: current status is {}", revision.status.to_str()),
-            ));
-        }
-        
-        // Get the part
-        let part_manager = PartManager::new(&tx);
-        let part = part_manager.get_part(revision.part_id.parse::<i64>().unwrap())?;
-        
-        // Generate the display part number
-        let display_part_number = part.display_part_number(&tx);
-        
-        // Create a review branch
-        let feature_branch = format!("part/{}/draft", display_part_number);
-        let review_branch = format!("part/{}/review", display_part_number);
-        
-        // Create and checkout the review branch
-        // Open the repository first
-        let repo = self.git_manager.open_repository(repo_path)?;
-        self.git_manager.create_branch(&repo, &review_branch)?;
-        self.git_manager.checkout_branch(&repo, &review_branch)?;
-        
-        // Update the revision status to In Review
-        revision_manager.update_status(revision_id, RevisionStatus::InReview)?;
-        
-        // Create approval requests for each reviewer
-        for reviewer in reviewers {
-            let approval = Approval::new(
-                revision_id,
-                reviewer,
-                ApprovalStatus::Pending,
-                None,
-            );
-            approval_manager.create_approval(&approval)?;
-        }
-        
-        // Commit the transaction
-        tx.commit()?;
-        
-        Ok(())
+        self.connection_manager.transaction(|tx| {
+            // Create managers
+            let revision_manager = RevisionManager::new_with_transaction(tx);
+            let approval_manager = ApprovalManager::new_with_transaction(tx);
+            
+            // Get the revision
+            let revision = revision_manager.get_revision_in_transaction(revision_id, tx)?;
+            
+            // Check if the user has permission to submit the part for review
+            if !self.current_user.can_edit_part(&revision.created_by) {
+                return Err(PartManagementError::PermissionDenied(
+                    "User does not have permission to submit this part for review".to_string(),
+                ));
+            }
+            
+            // Check if the revision is in Draft state
+            if revision.status != RevisionStatus::Draft {
+                return Err(PartManagementError::InvalidStateTransition(
+                    format!("Cannot submit revision for review: current status is {}", revision.status.to_str()),
+                ));
+            }
+            
+            // Get the part
+            let part_manager = PartManager::new_with_transaction(tx);
+            let part = part_manager.get_part_in_transaction(revision.part_id.parse::<i64>().unwrap(), tx)?;
+            
+            // Generate the display part number
+            let display_part_number = part.display_part_number(tx);
+            
+            // Create a review branch
+            let feature_branch = format!("part/{}/draft", display_part_number);
+            let review_branch = format!("part/{}/review", display_part_number);
+            
+            // Create and checkout the review branch
+            // Open the repository first
+            let repo = self.git_manager.open_repository(repo_path)?;
+            self.git_manager.create_branch(&repo, &review_branch)?;
+            self.git_manager.checkout_branch(&repo, &review_branch)?;
+            
+            // Update the revision status to In Review
+            revision_manager.update_status_in_transaction(revision_id, RevisionStatus::InReview, tx)?;
+            
+            // Create approval requests for each reviewer
+            for reviewer in reviewers {
+                let approval = Approval::new(
+                    revision_id,
+                    reviewer,
+                    ApprovalStatus::Pending,
+                    None,
+                );
+                approval_manager.create_approval_in_transaction(&approval, tx)?;
+            }
+            
+            Ok(())
+        }).map_err(|e| e.into())
     }
     
     /// Approve a revision
@@ -332,64 +329,62 @@ impl<'a> PartManagementManager<'a> {
     ///
     /// Returns a PartManagementError if the revision could not be approved
     pub fn approve_revision(
-        &mut self,
+        &self,
         revision_id: i64,
         comments: Option<String>,
     ) -> PartManagementResult<()> {
-        // Start a transaction
-        let tx = self.connection.transaction()?;
-        
-        // Create managers
-        let revision_manager = RevisionManager::new(&tx);
-        let approval_manager = ApprovalManager::new(&tx);
-        
-        // Get the revision
-        let revision = revision_manager.get_revision(revision_id)?;
-        
-        // Check if the user has permission to approve the revision
-        if !self.current_user.can_approve_part(&revision.created_by) {
-            return Err(PartManagementError::PermissionDenied(
-                "User does not have permission to approve this revision".to_string(),
-            ));
-        }
-        
-        // Check if the revision is in In Review state
-        if revision.status != RevisionStatus::InReview {
-            return Err(PartManagementError::InvalidStateTransition(
-                format!("Cannot approve revision: current status is {}", revision.status.to_str()),
-            ));
-        }
-        
-        // Get the approval for this user
-        let approval = match approval_manager.get_approval_for_revision_and_approver(
-            revision_id,
-            &self.current_user.username,
-        ) {
-            Ok(approval) => approval,
-            Err(_) => {
-                // Create a new approval if one doesn't exist
-                let approval = Approval::new(
-                    revision_id,
-                    self.current_user.username.clone(),
-                    ApprovalStatus::Pending,
-                    None,
-                );
-                let approval_id = approval_manager.create_approval(&approval)?;
-                approval_manager.get_approval(approval_id)?
+        self.connection_manager.transaction(|tx| {
+            // Create managers
+            let revision_manager = RevisionManager::new_with_transaction(tx);
+            let approval_manager = ApprovalManager::new_with_transaction(tx);
+            
+            // Get the revision
+            let revision = revision_manager.get_revision_in_transaction(revision_id, tx)?;
+            
+            // Check if the user has permission to approve the revision
+            if !self.current_user.can_approve_part(&revision.created_by) {
+                return Err(PartManagementError::PermissionDenied(
+                    "User does not have permission to approve this revision".to_string(),
+                ));
             }
-        };
-        
-        // Update the approval status
-        approval_manager.update_status(
-            approval.approval_id.unwrap(),
-            ApprovalStatus::Approved,
-            comments.as_deref(),
-        )?;
-        
-        // Commit the transaction
-        tx.commit()?;
-        
-        Ok(())
+            
+            // Check if the revision is in In Review state
+            if revision.status != RevisionStatus::InReview {
+                return Err(PartManagementError::InvalidStateTransition(
+                    format!("Cannot approve revision: current status is {}", revision.status.to_str()),
+                ));
+            }
+            
+            // Get the approval for this user
+            let approval = match approval_manager.get_approval_for_revision_and_approver_in_transaction(
+                revision_id,
+                &self.current_user.username,
+                tx
+            ) {
+                Ok(approval) => approval,
+                Err(_) => {
+                    // Create a new approval if one doesn't exist
+                    let approval = Approval::new(
+                        revision_id,
+                        self.current_user.username.clone(),
+                        ApprovalStatus::Pending,
+                        None,
+                    );
+                    let approval_id = approval_manager.create_approval_in_transaction(&approval, tx)?;
+                    approval_manager.get_approval_in_transaction(approval_id, tx)?
+                }
+            };
+            
+            // Update the approval status
+            approval_manager.update_status_in_transaction(
+                approval.approval_id.unwrap(),
+                ApprovalStatus::Approved,
+                comments.as_deref(),
+                tx
+            )?;
+            
+            Ok(())
+        }).map_err(|e| e.into())
     }
     
     /// Reject a revision
@@ -407,67 +402,65 @@ impl<'a> PartManagementManager<'a> {
     ///
     /// Returns a PartManagementError if the revision could not be rejected
     pub fn reject_revision(
-        &mut self,
+        &self,
         revision_id: i64,
         comments: Option<String>,
     ) -> PartManagementResult<()> {
-        // Start a transaction
-        let tx = self.connection.transaction()?;
-        
-        // Create managers
-        let revision_manager = RevisionManager::new(&tx);
-        let approval_manager = ApprovalManager::new(&tx);
-        
-        // Get the revision
-        let revision = revision_manager.get_revision(revision_id)?;
-        
-        // Check if the user has permission to reject the revision
-        if !self.current_user.can_approve_part(&revision.created_by) {
-            return Err(PartManagementError::PermissionDenied(
-                "User does not have permission to reject this revision".to_string(),
-            ));
-        }
-        
-        // Check if the revision is in In Review state
-        if revision.status != RevisionStatus::InReview {
-            return Err(PartManagementError::InvalidStateTransition(
-                format!("Cannot reject revision: current status is {}", revision.status.to_str()),
-            ));
-        }
-        
-        // Get the approval for this user
-        let approval = match approval_manager.get_approval_for_revision_and_approver(
-            revision_id,
-            &self.current_user.username,
-        ) {
-            Ok(approval) => approval,
-            Err(_) => {
-                // Create a new approval if one doesn't exist
-                let approval = Approval::new(
-                    revision_id,
-                    self.current_user.username.clone(),
-                    ApprovalStatus::Pending,
-                    None,
-                );
-                let approval_id = approval_manager.create_approval(&approval)?;
-                approval_manager.get_approval(approval_id)?
+        self.connection_manager.transaction(|tx| {
+            // Create managers
+            let revision_manager = RevisionManager::new_with_transaction(tx);
+            let approval_manager = ApprovalManager::new_with_transaction(tx);
+            
+            // Get the revision
+            let revision = revision_manager.get_revision_in_transaction(revision_id, tx)?;
+            
+            // Check if the user has permission to reject the revision
+            if !self.current_user.can_approve_part(&revision.created_by) {
+                return Err(PartManagementError::PermissionDenied(
+                    "User does not have permission to reject this revision".to_string(),
+                ));
             }
-        };
-        
-        // Update the approval status
-        approval_manager.update_status(
-            approval.approval_id.unwrap(),
-            ApprovalStatus::Rejected,
-            comments.as_deref(),
-        )?;
-        
-        // Update the revision status back to Draft
-        revision_manager.update_status(revision_id, RevisionStatus::Draft)?;
-        
-        // Commit the transaction
-        tx.commit()?;
-        
-        Ok(())
+            
+            // Check if the revision is in In Review state
+            if revision.status != RevisionStatus::InReview {
+                return Err(PartManagementError::InvalidStateTransition(
+                    format!("Cannot reject revision: current status is {}", revision.status.to_str()),
+                ));
+            }
+            
+            // Get the approval for this user
+            let approval = match approval_manager.get_approval_for_revision_and_approver_in_transaction(
+                revision_id,
+                &self.current_user.username,
+                tx
+            ) {
+                Ok(approval) => approval,
+                Err(_) => {
+                    // Create a new approval if one doesn't exist
+                    let approval = Approval::new(
+                        revision_id,
+                        self.current_user.username.clone(),
+                        ApprovalStatus::Pending,
+                        None,
+                    );
+                    let approval_id = approval_manager.create_approval_in_transaction(&approval, tx)?;
+                    approval_manager.get_approval_in_transaction(approval_id, tx)?
+                }
+            };
+            
+            // Update the approval status
+            approval_manager.update_status_in_transaction(
+                approval.approval_id.unwrap(),
+                ApprovalStatus::Rejected,
+                comments.as_deref(),
+                tx
+            )?;
+            
+            // Update the revision status back to Draft
+            revision_manager.update_status_in_transaction(revision_id, RevisionStatus::Draft, tx)?;
+            
+            Ok(())
+        }).map_err(|e| e.into())
     }
     
     /// Release a revision
@@ -485,64 +478,60 @@ impl<'a> PartManagementManager<'a> {
     ///
     /// Returns a PartManagementError if the revision could not be released
     pub fn release_revision(
-        &mut self,
+        &self,
         revision_id: i64,
         repo_path: &Path,
     ) -> PartManagementResult<()> {
-        // Start a transaction
-        let tx = self.connection.transaction()?;
-        
-        // Create managers
-        let revision_manager = RevisionManager::new(&tx);
-        let approval_manager = ApprovalManager::new(&tx);
-        let part_manager = PartManager::new(&tx);
-        
-        // Get the revision
-        let revision = revision_manager.get_revision(revision_id)?;
-        
-        // Check if the user has permission to release the revision
-        if !self.current_user.can_approve_part(&revision.created_by) {
-            return Err(PartManagementError::PermissionDenied(
-                "User does not have permission to release this revision".to_string(),
-            ));
-        }
-        
-        // Check if the revision is in In Review state
-        if revision.status != RevisionStatus::InReview {
-            return Err(PartManagementError::InvalidStateTransition(
-                format!("Cannot release revision: current status is {}", revision.status.to_str()),
-            ));
-        }
-        
-        // Check if the revision is fully approved
-        if !approval_manager.is_revision_approved(revision_id)? {
-            return Err(PartManagementError::ApprovalRequired(
-                "Revision must be fully approved before release".to_string(),
-            ));
-        }
-        
-        // Get the part
-        let part = part_manager.get_part(revision.part_id.parse::<i64>().unwrap())?;
-        
-        // Generate the display part number
-        let display_part_number = part.display_part_number(&tx);
-        
-        // Checkout the main branch
-        // Open the repository first
-        let repo = self.git_manager.open_repository(repo_path)?;
-        self.git_manager.checkout_branch(&repo, "main")?;
-        
-        // Merge the review branch into main
-        let review_branch = format!("part/{}/review", display_part_number);
-        self.git_manager.merge_branch(&repo, &review_branch)?;
-        
-        // Update the revision status to Released
-        revision_manager.update_status(revision_id, RevisionStatus::Released)?;
-        
-        // Commit the transaction
-        tx.commit()?;
-        
-        Ok(())
+        self.connection_manager.transaction(|tx| {
+            // Create managers
+            let revision_manager = RevisionManager::new_with_transaction(tx);
+            let approval_manager = ApprovalManager::new_with_transaction(tx);
+            let part_manager = PartManager::new_with_transaction(tx);
+            
+            // Get the revision
+            let revision = revision_manager.get_revision_in_transaction(revision_id, tx)?;
+            
+            // Check if the user has permission to release the revision
+            if !self.current_user.can_approve_part(&revision.created_by) {
+                return Err(PartManagementError::PermissionDenied(
+                    "User does not have permission to release this revision".to_string(),
+                ));
+            }
+            
+            // Check if the revision is in In Review state
+            if revision.status != RevisionStatus::InReview {
+                return Err(PartManagementError::InvalidStateTransition(
+                    format!("Cannot release revision: current status is {}", revision.status.to_str()),
+                ));
+            }
+            
+            // Check if the revision is fully approved
+            if !approval_manager.is_revision_approved_in_transaction(revision_id, tx)? {
+                return Err(PartManagementError::ApprovalRequired(
+                    "Revision must be fully approved before release".to_string(),
+                ));
+            }
+            
+            // Get the part
+            let part = part_manager.get_part_in_transaction(revision.part_id.parse::<i64>().unwrap(), tx)?;
+            
+            // Generate the display part number
+            let display_part_number = part.display_part_number(tx);
+            
+            // Checkout the main branch
+            // Open the repository first
+            let repo = self.git_manager.open_repository(repo_path)?;
+            self.git_manager.checkout_branch(&repo, "main")?;
+            
+            // Merge the review branch into main
+            let review_branch = format!("part/{}/review", display_part_number);
+            self.git_manager.merge_branch(&repo, &review_branch)?;
+            
+            // Update the revision status to Released
+            revision_manager.update_status_in_transaction(revision_id, RevisionStatus::Released, tx)?;
+            
+            Ok(())
+        }).map_err(|e| e.into())
     }
     
     /// Mark a revision as obsolete
@@ -559,39 +548,35 @@ impl<'a> PartManagementManager<'a> {
     ///
     /// Returns a PartManagementError if the revision could not be marked as obsolete
     pub fn mark_as_obsolete(
-        &mut self,
+        &self,
         revision_id: i64,
     ) -> PartManagementResult<()> {
-        // Start a transaction
-        let tx = self.connection.transaction()?;
-        
-        // Create managers
-        let revision_manager = RevisionManager::new(&tx);
-        
-        // Get the revision
-        let revision = revision_manager.get_revision(revision_id)?;
-        
-        // Check if the user has permission to mark the revision as obsolete
-        if !self.current_user.can_approve_part(&revision.created_by) {
-            return Err(PartManagementError::PermissionDenied(
-                "User does not have permission to mark this revision as obsolete".to_string(),
-            ));
-        }
-        
-        // Check if the revision is in Released state
-        if revision.status != RevisionStatus::Released {
-            return Err(PartManagementError::InvalidStateTransition(
-                format!("Cannot mark revision as obsolete: current status is {}", revision.status.to_str()),
-            ));
-        }
-        
-        // Update the revision status to Obsolete
-        revision_manager.update_status(revision_id, RevisionStatus::Obsolete)?;
-        
-        // Commit the transaction
-        tx.commit()?;
-        
-        Ok(())
+        self.connection_manager.transaction(|tx| {
+            // Create managers
+            let revision_manager = RevisionManager::new_with_transaction(tx);
+            
+            // Get the revision
+            let revision = revision_manager.get_revision_in_transaction(revision_id, tx)?;
+            
+            // Check if the user has permission to mark the revision as obsolete
+            if !self.current_user.can_approve_part(&revision.created_by) {
+                return Err(PartManagementError::PermissionDenied(
+                    "User does not have permission to mark this revision as obsolete".to_string(),
+                ));
+            }
+            
+            // Check if the revision is in Released state
+            if revision.status != RevisionStatus::Released {
+                return Err(PartManagementError::InvalidStateTransition(
+                    format!("Cannot mark revision as obsolete: current status is {}", revision.status.to_str()),
+                ));
+            }
+            
+            // Update the revision status to Obsolete
+            revision_manager.update_status_in_transaction(revision_id, RevisionStatus::Obsolete, tx)?;
+            
+            Ok(())
+        }).map_err(|e| e.into())
     }
     
     /// Create a new revision of a part
@@ -609,67 +594,63 @@ impl<'a> PartManagementManager<'a> {
     ///
     /// Returns a PartManagementError if the revision could not be created
     pub fn create_revision(
-        &mut self,
+        &self,
         part_id: i64,
         repo_path: &Path,
     ) -> PartManagementResult<i64> {
-        // Start a transaction
-        let tx = self.connection.transaction()?;
-        
-        // Create managers
-        let part_manager = PartManager::new(&tx);
-        let revision_manager = RevisionManager::new(&tx);
-        
-        // Get the part
-        let part = part_manager.get_part(part_id)?;
-        
-        // Check if the user has permission to create a revision
-        if !self.current_user.can_create_parts() {
-            return Err(PartManagementError::PermissionDenied(
-                "User does not have permission to create revisions".to_string(),
-            ));
-        }
-        
-        // Get the latest revision
-        let latest_revision = revision_manager.get_latest_revision(&part_id.to_string())?;
-        
-        // Check if the latest revision is in Released state
-        if latest_revision.status != RevisionStatus::Released {
-            return Err(PartManagementError::InvalidStateTransition(
-                format!("Cannot create new revision: latest revision status is {}", latest_revision.status.to_str()),
-            ));
-        }
-        
-        // Get the next version number
-        let next_version = revision_manager.get_next_version(&part_id.to_string())?;
-        
-        // Generate the display part number
-        let display_part_number = part.display_part_number(&tx);
-        
-        // Create a new feature branch from main
-        let branch_name = format!("part/{}/draft", display_part_number);
-        // Open the repository first
-        let repo = self.git_manager.open_repository(repo_path)?;
-        self.git_manager.checkout_branch(&repo, "main")?;
-        self.git_manager.create_branch(&repo, &branch_name)?;
-        self.git_manager.checkout_branch(&repo, &branch_name)?;
-        
-        // Create a new revision in Draft state
-        let revision = Revision::new(
-            part_id.to_string(),
-            next_version,
-            RevisionStatus::Draft,
-            self.current_user.username.clone(),
-            None, // No commit hash yet
-        );
-        
-        // Save the revision to the database
-        let revision_id = revision_manager.create_revision(&revision)?;
-        
-        // Commit the transaction
-        tx.commit()?;
-        
-        Ok(revision_id)
+        self.connection_manager.transaction(|tx| {
+            // Create managers
+            let part_manager = PartManager::new_with_transaction(tx);
+            let revision_manager = RevisionManager::new_with_transaction(tx);
+            
+            // Get the part
+            let part = part_manager.get_part_in_transaction(part_id, tx)?;
+            
+            // Check if the user has permission to create a revision
+            if !self.current_user.can_create_parts() {
+                return Err(PartManagementError::PermissionDenied(
+                    "User does not have permission to create revisions".to_string(),
+                ));
+            }
+            
+            // Get the latest revision
+            let latest_revision = revision_manager.get_latest_revision_in_transaction(&part_id.to_string(), tx)?;
+            
+            // Check if the latest revision is in Released state
+            if latest_revision.status != RevisionStatus::Released {
+                return Err(PartManagementError::InvalidStateTransition(
+                    format!("Cannot create new revision: latest revision status is {}", latest_revision.status.to_str()),
+                ));
+            }
+            
+            // Get the next version number
+            let next_version = revision_manager.get_next_version_in_transaction(&part_id.to_string(), tx)?;
+            
+            // Generate the display part number
+            let display_part_number = part.display_part_number(tx);
+            
+            // Create a new feature branch from main
+            let branch_name = format!("part/{}/draft", display_part_number);
+            // Open the repository first
+            let repo = self.git_manager.open_repository(repo_path)?;
+            self.git_manager.checkout_branch(&repo, "main")?;
+            self.git_manager.create_branch(&repo, &branch_name)?;
+            self.git_manager.checkout_branch(&repo, &branch_name)?;
+            
+            // Create a new revision in Draft state
+            let revision = Revision::new(
+                part_id.to_string(),
+                next_version,
+                RevisionStatus::Draft,
+                self.current_user.username.clone(),
+                None, // No commit hash yet
+            );
+            
+            // Save the revision to the database
+            let revision_id = revision_manager.create_revision_in_transaction(&revision, tx)?;
+            
+            Ok(revision_id)
+        }).map_err(|e| e.into())
     }
     
     /// Update the commit hash for a revision
@@ -687,27 +668,29 @@ impl<'a> PartManagementManager<'a> {
     ///
     /// Returns a PartManagementError if the commit hash could not be updated
     pub fn update_commit_hash(
-        &mut self,
+        &self,
         revision_id: i64,
         commit_hash: &str,
     ) -> PartManagementResult<()> {
-        // Create a revision manager
-        let revision_manager = RevisionManager::new(self.connection);
-        
-        // Get the revision
-        let revision = revision_manager.get_revision(revision_id)?;
-        
-        // Check if the user has permission to update the commit hash
-        if !self.current_user.can_edit_part(&revision.created_by) {
-            return Err(PartManagementError::PermissionDenied(
-                "User does not have permission to update this revision".to_string(),
-            ));
-        }
-        
-        // Update the commit hash
-        revision_manager.update_commit_hash(revision_id, commit_hash)?;
-        
-        Ok(())
+        self.connection_manager.transaction(|tx| {
+            // Create a revision manager
+            let revision_manager = RevisionManager::new_with_transaction(tx);
+            
+            // Get the revision
+            let revision = revision_manager.get_revision_in_transaction(revision_id, tx)?;
+            
+            // Check if the user has permission to update the commit hash
+            if !self.current_user.can_edit_part(&revision.created_by) {
+                return Err(PartManagementError::PermissionDenied(
+                    "User does not have permission to update this revision".to_string(),
+                ));
+            }
+            
+            // Update the commit hash
+            revision_manager.update_commit_hash_in_transaction(revision_id, commit_hash, tx)?;
+            
+            Ok(())
+        }).map_err(|e| e.into())
     }
     
     /// Get all revisions for a part with their approval status
@@ -724,24 +707,26 @@ impl<'a> PartManagementManager<'a> {
     ///
     /// Returns a PartManagementError if the revisions could not be retrieved
     pub fn get_revisions_with_approvals(
-        &mut self,
+        &self,
         part_id: i64,
     ) -> PartManagementResult<Vec<(Revision, Vec<Approval>)>> {
-        // Create managers
-        let revision_manager = RevisionManager::new(self.connection);
-        let approval_manager = ApprovalManager::new(self.connection);
-        
-        // Get all revisions for the part
-        let revisions = revision_manager.get_revisions_for_part(&part_id.to_string())?;
-        
-        // Get approvals for each revision
-        let mut result = Vec::new();
-        for revision in revisions {
-            let approvals = approval_manager.get_approvals_for_revision(revision.revision_id.unwrap())?;
-            result.push((revision, approvals));
-        }
-        
-        Ok(result)
+        self.connection_manager.execute(|conn| {
+            // Create managers
+            let revision_manager = RevisionManager::new(self.connection_manager);
+            let approval_manager = ApprovalManager::new(self.connection_manager);
+            
+            // Get all revisions for the part
+            let revisions = revision_manager.get_revisions_for_part(&part_id.to_string())?;
+            
+            // Get approvals for each revision
+            let mut result = Vec::new();
+            for revision in revisions {
+                let approvals = approval_manager.get_approvals_for_revision(revision.revision_id.unwrap())?;
+                result.push((revision, approvals));
+            }
+            
+            Ok(result)
+        }).map_err(|e| e.into())
     }
 }
 
@@ -763,11 +748,11 @@ mod tests {
         let repo_path = repo_dir.path();
         
         // Create a new database manager and initialize the schema
-        let mut db_manager = DatabaseManager::new(&db_path).unwrap();
+        let db_manager = DatabaseManager::new(&db_path).unwrap();
         db_manager.initialize_schema().unwrap();
         
         // Create a workflow manager and set up the default part workflow
-        let workflow_manager = WorkflowManager::new(db_manager.connection());
+        let workflow_manager = WorkflowManager::new(db_manager.connection_manager());
         workflow_manager.create_default_part_workflow().unwrap();
         
         // Create a Git backend manager
@@ -783,7 +768,7 @@ mod tests {
         
         // Create a part management manager
         let part_mgmt = PartManagementManager::new(
-            db_manager.connection(),
+            db_manager.connection_manager(),
             &git_manager,
             user,
         );
@@ -798,12 +783,12 @@ mod tests {
         ).unwrap();
         
         // Check that the part was created
-        let part_manager = PartManager::new(db_manager.connection());
+        let part_manager = PartManager::new(db_manager.connection_manager());
         let retrieved_part = part_manager.get_part(part.part_id).unwrap();
         assert_eq!(retrieved_part.name, "10K Resistor");
         
         // Check that the revision was created
-        let revision_manager = RevisionManager::new(db_manager.connection());
+        let revision_manager = RevisionManager::new(db_manager.connection_manager());
         let revision = revision_manager.get_revision(revision_id).unwrap();
         assert_eq!(revision.status, RevisionStatus::Draft);
         
@@ -811,8 +796,8 @@ mod tests {
         let reviewer = User::new("reviewer".to_string(), UserRole::Designer);
         
         // Create a part management manager for the reviewer
-        let mut reviewer_mgmt = PartManagementManager::new(
-            db_manager.connection(),
+        let reviewer_mgmt = PartManagementManager::new(
+            db_manager.connection_manager(),
             &git_manager,
             reviewer,
         );
@@ -829,7 +814,7 @@ mod tests {
         assert_eq!(revision.status, RevisionStatus::InReview);
         
         // Check that an approval was created
-        let approval_manager = ApprovalManager::new(db_manager.connection());
+        let approval_manager = ApprovalManager::new(db_manager.connection_manager());
         let approvals = approval_manager.get_approvals_for_revision(revision_id).unwrap();
         assert_eq!(approvals.len(), 1);
         assert_eq!(approvals[0].approver, "reviewer");

@@ -2,8 +2,9 @@
 //!
 //! This module provides functionality for managing properties of parts and revisions in the database.
 
-use rusqlite::{Connection, params, Row, Result as SqliteResult};
+use rusqlite::{Connection, Transaction, params, Row, Result as SqliteResult};
 use crate::database::schema::{DatabaseError, DatabaseResult};
+use crate::database::connection_manager::ConnectionManager;
 
 /// Type of property value
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -142,8 +143,8 @@ impl Property {
 
 /// Manager for property operations
 pub struct PropertyManager<'a> {
-    /// Connection to the SQLite database
-    connection: &'a Connection,
+    /// Connection manager for the SQLite database
+    connection_manager: &'a ConnectionManager,
 }
 
 impl<'a> PropertyManager<'a> {
@@ -151,13 +152,30 @@ impl<'a> PropertyManager<'a> {
     ///
     /// # Arguments
     ///
-    /// * `connection` - Connection to the SQLite database
+    /// * `connection_manager` - Connection manager for the SQLite database
     ///
     /// # Returns
     ///
     /// A new PropertyManager instance
-    pub fn new(connection: &'a Connection) -> Self {
-        Self { connection }
+    pub fn new(connection_manager: &'a ConnectionManager) -> Self {
+        Self { connection_manager }
+    }
+    
+    /// Create a new PropertyManager with a transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `transaction` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// A new PropertyManager instance
+    ///
+    /// # Note
+    ///
+    /// This is a temporary method for backward compatibility during migration
+    pub fn new_with_transaction(_transaction: &'a Transaction) -> Self {
+        unimplemented!("This method is a placeholder for backward compatibility during migration")
     }
 
     /// Create a new property in the database
@@ -174,7 +192,38 @@ impl<'a> PropertyManager<'a> {
     ///
     /// Returns a DatabaseError if the property could not be created
     pub fn create_property(&self, property: &Property) -> DatabaseResult<i64> {
-        self.connection.execute(
+        self.connection_manager.execute_mut(|conn| {
+            conn.execute(
+                "INSERT INTO Properties (part_id, revision_id, key, value, type)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![
+                    property.part_id,
+                    property.revision_id,
+                    property.key,
+                    property.value,
+                    property.property_type.to_str(),
+                ],
+            )?;
+            Ok(conn.last_insert_rowid())
+        }).map_err(DatabaseError::from)
+    }
+    
+    /// Create a new property in the database within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `property` - The property to create
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// The ID of the newly created property
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the property could not be created
+    pub fn create_property_in_transaction(&self, property: &Property, tx: &Transaction) -> DatabaseResult<i64> {
+        tx.execute(
             "INSERT INTO Properties (part_id, revision_id, key, value, type)
              VALUES (?1, ?2, ?3, ?4, ?5)",
             params![
@@ -185,7 +234,7 @@ impl<'a> PropertyManager<'a> {
                 property.property_type.to_str(),
             ],
         )?;
-        Ok(self.connection.last_insert_rowid())
+        Ok(tx.last_insert_rowid())
     }
 
     /// Get a property by its ID
@@ -202,7 +251,34 @@ impl<'a> PropertyManager<'a> {
     ///
     /// Returns a DatabaseError if the property could not be found
     pub fn get_property(&self, property_id: i64) -> DatabaseResult<Property> {
-        let property = self.connection.query_row(
+        self.connection_manager.execute(|conn| {
+            let property = conn.query_row(
+                "SELECT property_id, part_id, revision_id, key, value, type
+                 FROM Properties
+                 WHERE property_id = ?1",
+                params![property_id],
+                |row| self.row_to_property(row),
+            )?;
+            Ok(property)
+        }).map_err(DatabaseError::from)
+    }
+    
+    /// Get a property by its ID within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `property_id` - The ID of the property to get
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// The property with the specified ID
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the property could not be found
+    pub fn get_property_in_transaction(&self, property_id: i64, tx: &Transaction) -> DatabaseResult<Property> {
+        let property = tx.query_row(
             "SELECT property_id, part_id, revision_id, key, value, type
              FROM Properties
              WHERE property_id = ?1",
@@ -226,7 +302,38 @@ impl<'a> PropertyManager<'a> {
     ///
     /// Returns a DatabaseError if the properties could not be retrieved
     pub fn get_part_properties(&self, part_id: &str) -> DatabaseResult<Vec<Property>> {
-        let mut stmt = self.connection.prepare(
+        self.connection_manager.execute(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT property_id, part_id, revision_id, key, value, type
+                 FROM Properties
+                 WHERE part_id = ?1
+                 ORDER BY key",
+            )?;
+            let properties_iter = stmt.query_map(params![part_id], |row| self.row_to_property(row))?;
+            let mut properties = Vec::new();
+            for property_result in properties_iter {
+                properties.push(property_result?);
+            }
+            Ok(properties)
+        }).map_err(DatabaseError::from)
+    }
+    
+    /// Get all properties for a part within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `part_id` - The ID of the part
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// A vector of properties for the specified part
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the properties could not be retrieved
+    pub fn get_part_properties_in_transaction(&self, part_id: &str, tx: &Transaction) -> DatabaseResult<Vec<Property>> {
+        let mut stmt = tx.prepare(
             "SELECT property_id, part_id, revision_id, key, value, type
              FROM Properties
              WHERE part_id = ?1
@@ -254,7 +361,38 @@ impl<'a> PropertyManager<'a> {
     ///
     /// Returns a DatabaseError if the properties could not be retrieved
     pub fn get_revision_properties(&self, revision_id: i64) -> DatabaseResult<Vec<Property>> {
-        let mut stmt = self.connection.prepare(
+        self.connection_manager.execute(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT property_id, part_id, revision_id, key, value, type
+                 FROM Properties
+                 WHERE revision_id = ?1
+                 ORDER BY key",
+            )?;
+            let properties_iter = stmt.query_map(params![revision_id], |row| self.row_to_property(row))?;
+            let mut properties = Vec::new();
+            for property_result in properties_iter {
+                properties.push(property_result?);
+            }
+            Ok(properties)
+        }).map_err(DatabaseError::from)
+    }
+    
+    /// Get all properties for a revision within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `revision_id` - The ID of the revision
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// A vector of properties for the specified revision
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the properties could not be retrieved
+    pub fn get_revision_properties_in_transaction(&self, revision_id: i64, tx: &Transaction) -> DatabaseResult<Vec<Property>> {
+        let mut stmt = tx.prepare(
             "SELECT property_id, part_id, revision_id, key, value, type
              FROM Properties
              WHERE revision_id = ?1
@@ -283,7 +421,35 @@ impl<'a> PropertyManager<'a> {
     ///
     /// Returns a DatabaseError if the property could not be found
     pub fn get_part_property(&self, part_id: &str, key: &str) -> DatabaseResult<Property> {
-        let property = self.connection.query_row(
+        self.connection_manager.execute(|conn| {
+            let property = conn.query_row(
+                "SELECT property_id, part_id, revision_id, key, value, type
+                 FROM Properties
+                 WHERE part_id = ?1 AND key = ?2",
+                params![part_id, key],
+                |row| self.row_to_property(row),
+            )?;
+            Ok(property)
+        }).map_err(DatabaseError::from)
+    }
+    
+    /// Get a specific property for a part within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `part_id` - The ID of the part
+    /// * `key` - The key of the property
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// The property with the specified key for the specified part
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the property could not be found
+    pub fn get_part_property_in_transaction(&self, part_id: &str, key: &str, tx: &Transaction) -> DatabaseResult<Property> {
+        let property = tx.query_row(
             "SELECT property_id, part_id, revision_id, key, value, type
              FROM Properties
              WHERE part_id = ?1 AND key = ?2",
@@ -308,7 +474,35 @@ impl<'a> PropertyManager<'a> {
     ///
     /// Returns a DatabaseError if the property could not be found
     pub fn get_revision_property(&self, revision_id: i64, key: &str) -> DatabaseResult<Property> {
-        let property = self.connection.query_row(
+        self.connection_manager.execute(|conn| {
+            let property = conn.query_row(
+                "SELECT property_id, part_id, revision_id, key, value, type
+                 FROM Properties
+                 WHERE revision_id = ?1 AND key = ?2",
+                params![revision_id, key],
+                |row| self.row_to_property(row),
+            )?;
+            Ok(property)
+        }).map_err(DatabaseError::from)
+    }
+    
+    /// Get a specific property for a revision within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `revision_id` - The ID of the revision
+    /// * `key` - The key of the property
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// The property with the specified key for the specified revision
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the property could not be found
+    pub fn get_revision_property_in_transaction(&self, revision_id: i64, key: &str, tx: &Transaction) -> DatabaseResult<Property> {
+        let property = tx.query_row(
             "SELECT property_id, part_id, revision_id, key, value, type
              FROM Properties
              WHERE revision_id = ?1 AND key = ?2",
@@ -336,7 +530,44 @@ impl<'a> PropertyManager<'a> {
             DatabaseError::InitializationError("Property ID is required for update".to_string())
         })?;
 
-        self.connection.execute(
+        self.connection_manager.execute_mut(|conn| {
+            conn.execute(
+                "UPDATE Properties
+                 SET part_id = ?2, revision_id = ?3, key = ?4, value = ?5, type = ?6
+                 WHERE property_id = ?1",
+                params![
+                    property_id,
+                    property.part_id,
+                    property.revision_id,
+                    property.key,
+                    property.value,
+                    property.property_type.to_str(),
+                ],
+            )?;
+            Ok(())
+        }).map_err(DatabaseError::from)
+    }
+    
+    /// Update a property within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `property` - The property to update
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// Ok(()) if the property was successfully updated
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the property could not be updated
+    pub fn update_property_in_transaction(&self, property: &Property, tx: &Transaction) -> DatabaseResult<()> {
+        let property_id = property.property_id.ok_or_else(|| {
+            DatabaseError::InitializationError("Property ID is required for update".to_string())
+        })?;
+
+        tx.execute(
             "UPDATE Properties
              SET part_id = ?2, revision_id = ?3, key = ?4, value = ?5, type = ?6
              WHERE property_id = ?1",
@@ -366,7 +597,31 @@ impl<'a> PropertyManager<'a> {
     ///
     /// Returns a DatabaseError if the property could not be deleted
     pub fn delete_property(&self, property_id: i64) -> DatabaseResult<()> {
-        self.connection.execute(
+        self.connection_manager.execute_mut(|conn| {
+            conn.execute(
+                "DELETE FROM Properties WHERE property_id = ?1",
+                params![property_id],
+            )?;
+            Ok(())
+        }).map_err(DatabaseError::from)
+    }
+    
+    /// Delete a property within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `property_id` - The ID of the property to delete
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// Ok(()) if the property was successfully deleted
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the property could not be deleted
+    pub fn delete_property_in_transaction(&self, property_id: i64, tx: &Transaction) -> DatabaseResult<()> {
+        tx.execute(
             "DELETE FROM Properties WHERE property_id = ?1",
             params![property_id],
         )?;
@@ -417,12 +672,12 @@ mod tests {
         let db_path = temp_dir.path().join("test.db");
 
         // Create a new database manager and initialize the schema
-        let mut db_manager = DatabaseManager::new(&db_path).unwrap();
+        let db_manager = DatabaseManager::new(&db_path).unwrap();
         db_manager.initialize_schema().unwrap();
 
         // Create a part manager and a property manager
-        let part_manager = PartManager::new(db_manager.connection());
-        let property_manager = PropertyManager::new(db_manager.connection());
+        let part_manager = PartManager::new(db_manager.connection_manager());
+        let property_manager = PropertyManager::new(db_manager.connection_manager());
 
         // Create a new part
         let part = Part::new(
@@ -464,13 +719,13 @@ mod tests {
         let db_path = temp_dir.path().join("test.db");
 
         // Create a new database manager and initialize the schema
-        let mut db_manager = DatabaseManager::new(&db_path).unwrap();
+        let db_manager = DatabaseManager::new(&db_path).unwrap();
         db_manager.initialize_schema().unwrap();
 
         // Create managers
-        let part_manager = PartManager::new(db_manager.connection());
-        let revision_manager = RevisionManager::new(db_manager.connection());
-        let property_manager = PropertyManager::new(db_manager.connection());
+        let part_manager = PartManager::new(db_manager.connection_manager());
+        let revision_manager = RevisionManager::new(db_manager.connection_manager());
+        let property_manager = PropertyManager::new(db_manager.connection_manager());
 
         // Create a new part
         let part = Part::new(

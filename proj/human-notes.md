@@ -13,4 +13,5 @@
 - Less need ot update the decision log
 - get it to read the coding guidelines and prd every time
 - trim the progress log and context
-- review the first 15k tokens that get sent..
+- review the first 15k tokens that get sent.. what are they?
+- for code: when refactoring a file do all the changes in one edit where possible

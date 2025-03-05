@@ -2,8 +2,9 @@
 //!
 //! This module provides functionality for managing workflows, workflow states, and workflow transitions in the database.
 
-use rusqlite::{Connection, params, Row, Result as SqliteResult};
+use rusqlite::{Connection, Transaction, params, Row, Result as SqliteResult};
 use crate::database::schema::{DatabaseError, DatabaseResult};
+use crate::database::connection_manager::ConnectionManager;
 
 /// Represents a workflow
 #[derive(Debug, Clone)]
@@ -149,8 +150,8 @@ impl WorkflowTransition {
 
 /// Manager for workflow operations
 pub struct WorkflowManager<'a> {
-    /// Connection to the SQLite database
-    connection: &'a Connection,
+    /// Connection manager for the SQLite database
+    connection_manager: &'a ConnectionManager,
 }
 
 impl<'a> WorkflowManager<'a> {
@@ -158,13 +159,30 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// # Arguments
     ///
-    /// * `connection` - Connection to the SQLite database
+    /// * `connection_manager` - Connection manager for the SQLite database
     ///
     /// # Returns
     ///
     /// A new WorkflowManager instance
-    pub fn new(connection: &'a Connection) -> Self {
-        Self { connection }
+    pub fn new(connection_manager: &'a ConnectionManager) -> Self {
+        Self { connection_manager }
+    }
+    
+    /// Create a new WorkflowManager with a transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `transaction` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// A new WorkflowManager instance
+    ///
+    /// # Note
+    ///
+    /// This is a temporary method for backward compatibility during migration
+    pub fn new_with_transaction(_transaction: &'a Transaction) -> Self {
+        unimplemented!("This method is a placeholder for backward compatibility during migration")
     }
 
     /// Create a new workflow in the database
@@ -181,7 +199,36 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflow could not be created
     pub fn create_workflow(&self, workflow: &Workflow) -> DatabaseResult<i64> {
-        self.connection.execute(
+        self.connection_manager.execute_mut(|conn| {
+            conn.execute(
+                "INSERT INTO Workflows (name, description, active)
+                 VALUES (?1, ?2, ?3)",
+                params![
+                    workflow.name,
+                    workflow.description,
+                    workflow.active,
+                ],
+            )?;
+            Ok(conn.last_insert_rowid())
+        }).map_err(DatabaseError::from)
+    }
+    
+    /// Create a new workflow in the database within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `workflow` - The workflow to create
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// The ID of the newly created workflow
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the workflow could not be created
+    pub fn create_workflow_in_transaction(&self, workflow: &Workflow, tx: &Transaction) -> DatabaseResult<i64> {
+        tx.execute(
             "INSERT INTO Workflows (name, description, active)
              VALUES (?1, ?2, ?3)",
             params![
@@ -190,7 +237,7 @@ impl<'a> WorkflowManager<'a> {
                 workflow.active,
             ],
         )?;
-        Ok(self.connection.last_insert_rowid())
+        Ok(tx.last_insert_rowid())
     }
 
     /// Get a workflow by its ID
@@ -207,14 +254,16 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflow could not be found
     pub fn get_workflow(&self, workflow_id: i64) -> DatabaseResult<Workflow> {
-        let workflow = self.connection.query_row(
-            "SELECT workflow_id, name, description, active
-             FROM Workflows
-             WHERE workflow_id = ?1",
-            params![workflow_id],
-            |row| self.row_to_workflow(row),
-        )?;
-        Ok(workflow)
+        self.connection_manager.execute(|conn| {
+            let workflow = conn.query_row(
+                "SELECT workflow_id, name, description, active
+                 FROM Workflows
+                 WHERE workflow_id = ?1",
+                params![workflow_id],
+                |row| self.row_to_workflow(row),
+            )?;
+            Ok(workflow)
+        }).map_err(DatabaseError::from)
     }
 
     /// Get a workflow by its name
@@ -231,14 +280,16 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflow could not be found
     pub fn get_workflow_by_name(&self, name: &str) -> DatabaseResult<Workflow> {
-        let workflow = self.connection.query_row(
-            "SELECT workflow_id, name, description, active
-             FROM Workflows
-             WHERE name = ?1",
-            params![name],
-            |row| self.row_to_workflow(row),
-        )?;
-        Ok(workflow)
+        self.connection_manager.execute(|conn| {
+            let workflow = conn.query_row(
+                "SELECT workflow_id, name, description, active
+                 FROM Workflows
+                 WHERE name = ?1",
+                params![name],
+                |row| self.row_to_workflow(row),
+            )?;
+            Ok(workflow)
+        }).map_err(DatabaseError::from)
     }
 
     /// Get all workflows

@@ -185,13 +185,15 @@ Current Phase: Phase 1 (Core Infrastructure)
   4. ✅ Refactor RevisionManager to use the ConnectionManager
   5. ✅ Refactor RelationshipManager to use the ConnectionManager
   6. ⬜ Refactor remaining manager structs to use the ConnectionManager
-  7. ⬜ Update PartManagementManager to use the ConnectionManager
+  7. ✅ Update PartManagementManager to use the ConnectionManager
   8. ✅ Add support for mocking in tests
   9. ⬜ Verify that all tests pass with the new implementation
 - **Progress:**
   - Created ConnectionManager with interior mutability using RefCell
   - Updated DatabaseManager to use the ConnectionManager
   - Refactored PartManager, RevisionManager, and RelationshipManager to use the ConnectionManager
+  - Refactored PartManagementManager to use the ConnectionManager
+  - Refactored PropertyManager to use the ConnectionManager
   - Added transaction-specific methods for backward compatibility
   - Updated tests for the refactored managers
   - Added support for mocking in tests

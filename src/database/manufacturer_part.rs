@@ -2,8 +2,9 @@
 //!
 //! This module provides functionality for managing manufacturer parts in the database.
 
-use rusqlite::{Connection, params, Row, Result as SqliteResult};
+use rusqlite::{Connection, Transaction, params, Row, Result as SqliteResult};
 use crate::database::schema::{DatabaseError, DatabaseResult};
+use crate::database::connection_manager::ConnectionManager;
 
 /// Status of a manufacturer part
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -104,8 +105,8 @@ impl ManufacturerPart {
 
 /// Manager for manufacturer part operations
 pub struct ManufacturerPartManager<'a> {
-    /// Connection to the SQLite database
-    connection: &'a Connection,
+    /// Connection manager for the SQLite database
+    connection_manager: &'a ConnectionManager,
 }
 
 impl<'a> ManufacturerPartManager<'a> {
@@ -113,13 +114,30 @@ impl<'a> ManufacturerPartManager<'a> {
     ///
     /// # Arguments
     ///
-    /// * `connection` - Connection to the SQLite database
+    /// * `connection_manager` - Connection manager for the SQLite database
     ///
     /// # Returns
     ///
     /// A new ManufacturerPartManager instance
-    pub fn new(connection: &'a Connection) -> Self {
-        Self { connection }
+    pub fn new(connection_manager: &'a ConnectionManager) -> Self {
+        Self { connection_manager }
+    }
+    
+    /// Create a new ManufacturerPartManager with a transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `transaction` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// A new ManufacturerPartManager instance
+    ///
+    /// # Note
+    ///
+    /// This is a temporary method for backward compatibility during migration
+    pub fn new_with_transaction(_transaction: &'a Transaction) -> Self {
+        unimplemented!("This method is a placeholder for backward compatibility during migration")
     }
 
     /// Create a new manufacturer part in the database
@@ -136,7 +154,38 @@ impl<'a> ManufacturerPartManager<'a> {
     ///
     /// Returns a DatabaseError if the manufacturer part could not be created
     pub fn create_manufacturer_part(&self, manufacturer_part: &ManufacturerPart) -> DatabaseResult<i64> {
-        self.connection.execute(
+        self.connection_manager.execute_mut(|conn| {
+            conn.execute(
+                "INSERT INTO ManufacturerParts (part_id, manufacturer, mpn, description, status)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![
+                    manufacturer_part.part_id,
+                    manufacturer_part.manufacturer,
+                    manufacturer_part.mpn,
+                    manufacturer_part.description,
+                    manufacturer_part.status.to_str(),
+                ],
+            )?;
+            Ok(conn.last_insert_rowid())
+        }).map_err(DatabaseError::from)
+    }
+    
+    /// Create a new manufacturer part in the database within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `manufacturer_part` - The manufacturer part to create
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// The ID of the newly created manufacturer part
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the manufacturer part could not be created
+    pub fn create_manufacturer_part_in_transaction(&self, manufacturer_part: &ManufacturerPart, tx: &Transaction) -> DatabaseResult<i64> {
+        tx.execute(
             "INSERT INTO ManufacturerParts (part_id, manufacturer, mpn, description, status)
              VALUES (?1, ?2, ?3, ?4, ?5)",
             params![
@@ -147,7 +196,7 @@ impl<'a> ManufacturerPartManager<'a> {
                 manufacturer_part.status.to_str(),
             ],
         )?;
-        Ok(self.connection.last_insert_rowid())
+        Ok(tx.last_insert_rowid())
     }
 
     /// Get a manufacturer part by its ID
@@ -164,14 +213,16 @@ impl<'a> ManufacturerPartManager<'a> {
     ///
     /// Returns a DatabaseError if the manufacturer part could not be found
     pub fn get_manufacturer_part(&self, mpn_id: i64) -> DatabaseResult<ManufacturerPart> {
-        let manufacturer_part = self.connection.query_row(
-            "SELECT mpn_id, part_id, manufacturer, mpn, description, status
-             FROM ManufacturerParts
-             WHERE mpn_id = ?1",
-            params![mpn_id],
-            |row| self.row_to_manufacturer_part(row),
-        )?;
-        Ok(manufacturer_part)
+        self.connection_manager.execute(|conn| {
+            let manufacturer_part = conn.query_row(
+                "SELECT mpn_id, part_id, manufacturer, mpn, description, status
+                 FROM ManufacturerParts
+                 WHERE mpn_id = ?1",
+                params![mpn_id],
+                |row| self.row_to_manufacturer_part(row),
+            )?;
+            Ok(manufacturer_part)
+        }).map_err(DatabaseError::from)
     }
 
     /// Get all manufacturer parts for a part
@@ -188,18 +239,20 @@ impl<'a> ManufacturerPartManager<'a> {
     ///
     /// Returns a DatabaseError if the manufacturer parts could not be retrieved
     pub fn get_manufacturer_parts_for_part(&self, part_id: &str) -> DatabaseResult<Vec<ManufacturerPart>> {
-        let mut stmt = self.connection.prepare(
-            "SELECT mpn_id, part_id, manufacturer, mpn, description, status
-             FROM ManufacturerParts
-             WHERE part_id = ?1
-             ORDER BY manufacturer, mpn",
-        )?;
-        let manufacturer_parts_iter = stmt.query_map(params![part_id], |row| self.row_to_manufacturer_part(row))?;
-        let mut manufacturer_parts = Vec::new();
-        for manufacturer_part_result in manufacturer_parts_iter {
-            manufacturer_parts.push(manufacturer_part_result?);
-        }
-        Ok(manufacturer_parts)
+        self.connection_manager.execute(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT mpn_id, part_id, manufacturer, mpn, description, status
+                 FROM ManufacturerParts
+                 WHERE part_id = ?1
+                 ORDER BY manufacturer, mpn",
+            )?;
+            let manufacturer_parts_iter = stmt.query_map(params![part_id], |row| self.row_to_manufacturer_part(row))?;
+            let mut manufacturer_parts = Vec::new();
+            for manufacturer_part_result in manufacturer_parts_iter {
+                manufacturer_parts.push(manufacturer_part_result?);
+            }
+            Ok(manufacturer_parts)
+        }).map_err(DatabaseError::from)
     }
 
     /// Get manufacturer parts by manufacturer and MPN
@@ -217,17 +270,19 @@ impl<'a> ManufacturerPartManager<'a> {
     ///
     /// Returns a DatabaseError if the manufacturer parts could not be retrieved
     pub fn get_manufacturer_parts_by_mpn(&self, manufacturer: &str, mpn: &str) -> DatabaseResult<Vec<ManufacturerPart>> {
-        let mut stmt = self.connection.prepare(
-            "SELECT mpn_id, part_id, manufacturer, mpn, description, status
-             FROM ManufacturerParts
-             WHERE manufacturer = ?1 AND mpn = ?2",
-        )?;
-        let manufacturer_parts_iter = stmt.query_map(params![manufacturer, mpn], |row| self.row_to_manufacturer_part(row))?;
-        let mut manufacturer_parts = Vec::new();
-        for manufacturer_part_result in manufacturer_parts_iter {
-            manufacturer_parts.push(manufacturer_part_result?);
-        }
-        Ok(manufacturer_parts)
+        self.connection_manager.execute(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT mpn_id, part_id, manufacturer, mpn, description, status
+                 FROM ManufacturerParts
+                 WHERE manufacturer = ?1 AND mpn = ?2",
+            )?;
+            let manufacturer_parts_iter = stmt.query_map(params![manufacturer, mpn], |row| self.row_to_manufacturer_part(row))?;
+            let mut manufacturer_parts = Vec::new();
+            for manufacturer_part_result in manufacturer_parts_iter {
+                manufacturer_parts.push(manufacturer_part_result?);
+            }
+            Ok(manufacturer_parts)
+        }).map_err(DatabaseError::from)
     }
 
     /// Update a manufacturer part
@@ -248,7 +303,44 @@ impl<'a> ManufacturerPartManager<'a> {
             DatabaseError::InitializationError("Manufacturer Part ID is required for update".to_string())
         })?;
 
-        self.connection.execute(
+        self.connection_manager.execute_mut(|conn| {
+            conn.execute(
+                "UPDATE ManufacturerParts
+                 SET part_id = ?2, manufacturer = ?3, mpn = ?4, description = ?5, status = ?6
+                 WHERE mpn_id = ?1",
+                params![
+                    mpn_id,
+                    manufacturer_part.part_id,
+                    manufacturer_part.manufacturer,
+                    manufacturer_part.mpn,
+                    manufacturer_part.description,
+                    manufacturer_part.status.to_str(),
+                ],
+            )?;
+            Ok(())
+        }).map_err(DatabaseError::from)
+    }
+    
+    /// Update a manufacturer part within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `manufacturer_part` - The manufacturer part to update
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// Ok(()) if the manufacturer part was successfully updated
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the manufacturer part could not be updated
+    pub fn update_manufacturer_part_in_transaction(&self, manufacturer_part: &ManufacturerPart, tx: &Transaction) -> DatabaseResult<()> {
+        let mpn_id = manufacturer_part.mpn_id.ok_or_else(|| {
+            DatabaseError::InitializationError("Manufacturer Part ID is required for update".to_string())
+        })?;
+
+        tx.execute(
             "UPDATE ManufacturerParts
              SET part_id = ?2, manufacturer = ?3, mpn = ?4, description = ?5, status = ?6
              WHERE mpn_id = ?1",
@@ -278,7 +370,31 @@ impl<'a> ManufacturerPartManager<'a> {
     ///
     /// Returns a DatabaseError if the manufacturer part could not be deleted
     pub fn delete_manufacturer_part(&self, mpn_id: i64) -> DatabaseResult<()> {
-        self.connection.execute(
+        self.connection_manager.execute_mut(|conn| {
+            conn.execute(
+                "DELETE FROM ManufacturerParts WHERE mpn_id = ?1",
+                params![mpn_id],
+            )?;
+            Ok(())
+        }).map_err(DatabaseError::from)
+    }
+    
+    /// Delete a manufacturer part within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `mpn_id` - The ID of the manufacturer part to delete
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// Ok(()) if the manufacturer part was successfully deleted
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the manufacturer part could not be deleted
+    pub fn delete_manufacturer_part_in_transaction(&self, mpn_id: i64, tx: &Transaction) -> DatabaseResult<()> {
+        tx.execute(
             "DELETE FROM ManufacturerParts WHERE mpn_id = ?1",
             params![mpn_id],
         )?;
@@ -299,19 +415,21 @@ impl<'a> ManufacturerPartManager<'a> {
     ///
     /// Returns a DatabaseError if the search could not be performed
     pub fn search_manufacturer_parts(&self, search_term: &str) -> DatabaseResult<Vec<ManufacturerPart>> {
-        let search_pattern = format!("%{}%", search_term);
-        let mut stmt = self.connection.prepare(
-            "SELECT mpn_id, part_id, manufacturer, mpn, description, status
-             FROM ManufacturerParts
-             WHERE manufacturer LIKE ?1 OR mpn LIKE ?1
-             ORDER BY manufacturer, mpn",
-        )?;
-        let manufacturer_parts_iter = stmt.query_map(params![search_pattern], |row| self.row_to_manufacturer_part(row))?;
-        let mut manufacturer_parts = Vec::new();
-        for manufacturer_part_result in manufacturer_parts_iter {
-            manufacturer_parts.push(manufacturer_part_result?);
-        }
-        Ok(manufacturer_parts)
+        self.connection_manager.execute(|conn| {
+            let search_pattern = format!("%{}%", search_term);
+            let mut stmt = conn.prepare(
+                "SELECT mpn_id, part_id, manufacturer, mpn, description, status
+                 FROM ManufacturerParts
+                 WHERE manufacturer LIKE ?1 OR mpn LIKE ?1
+                 ORDER BY manufacturer, mpn",
+            )?;
+            let manufacturer_parts_iter = stmt.query_map(params![search_pattern], |row| self.row_to_manufacturer_part(row))?;
+            let mut manufacturer_parts = Vec::new();
+            for manufacturer_part_result in manufacturer_parts_iter {
+                manufacturer_parts.push(manufacturer_part_result?);
+            }
+            Ok(manufacturer_parts)
+        }).map_err(DatabaseError::from)
     }
 
     /// Convert a database row to a ManufacturerPart
@@ -357,12 +475,12 @@ mod tests {
         let db_path = temp_dir.path().join("test.db");
 
         // Create a new database manager and initialize the schema
-        let mut db_manager = DatabaseManager::new(&db_path).unwrap();
+        let db_manager = DatabaseManager::new(&db_path).unwrap();
         db_manager.initialize_schema().unwrap();
 
         // Create a part manager and a manufacturer part manager
-        let part_manager = PartManager::new(db_manager.connection());
-        let manufacturer_part_manager = ManufacturerPartManager::new(db_manager.connection());
+        let part_manager = PartManager::new(db_manager.connection_manager());
+        let manufacturer_part_manager = ManufacturerPartManager::new(db_manager.connection_manager());
 
         // Create a new part
         let part = Part::new(

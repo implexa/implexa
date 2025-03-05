@@ -1,7 +1,7 @@
 [package]
 name = "implexa"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 description = "A hardware-focused PLM/PDM solution that leverages Git for version control"
 authors = ["Implexa Team"]
 license = "MIT"
@@ -24,7 +24,25 @@ serde = { version = "1.0.195", features = ["derive"] }
 serde_json = "1.0.111"
 # Path manipulation
 path-clean = "1.0.1"
+# Tauri integration
+tauri = { version = "1.5.4", features = [ "dialog-all", "path-all", "shell-open", "fs-all", "window-all"] }
+# Hashing
+md5 = "0.7.0"
 
 [dev-dependencies]
 # Temporary file handling for tests
 tempfile = "3.10.0"
+# Mocking
+mockall = "0.12.1"
+# Parameterized testing
+rstest = "0.18.2"
+# Data-driven testing
+test-case = "3.3.1"
+# Property-based testing
+proptest = "1.4.0"
+# Benchmarking
+criterion = "0.5.1"
+
+[build-dependencies]
+# Tauri build
+tauri-build = { version = "1.5.4", features = [] }

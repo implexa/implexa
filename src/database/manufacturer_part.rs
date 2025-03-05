@@ -366,7 +366,7 @@ mod tests {
 
         // Create a new part
         let part = Part::new(
-            "ELE-RES-001".to_string(),
+            10001,
             "Electronic".to_string(),
             "Resistor".to_string(),
             "10K Resistor".to_string(),

@@ -388,3 +388,59 @@ This document tracks key architectural decisions made during the development of 
 - [DEC-012](./decisionLog.md#dec-012---unit-testing-approach) - Unit Testing Approach
 - [DEC-001](./decisionLog.md#dec-001---use-of-tauri-over-electron) - Use of Tauri over Electron
 - [DEC-002](./decisionLog.md#dec-002---enhanced-hybrid-part-numbering-schema) - Enhanced Hybrid Part Numbering Schema
+- [DEC-016](./decisionLog.md#dec-016---debugging-and-code-quality-improvements) - Debugging and Code Quality Improvements
+- [DEC-017](./decisionLog.md#dec-017---tauri-desktop-application-implementation) - Tauri Desktop Application Implementation
+
+### DEC-016 - Debugging and Code Quality Improvements
+- **Date:** 2025-03-04
+- **Status:** Implemented
+- **Context:** During the implementation of the unit testing framework, several code quality issues and bugs were identified that needed to be addressed to ensure the codebase was testable and reliable.
+- **Decision:** Implement a series of fixes and improvements to address the identified issues:
+  1. Fix syntax errors and missing implementations in key modules
+  2. Update dependency management in Cargo.toml
+  3. Improve error handling and type safety
+  4. Fix mutable reference issues in database connections
+  5. Ensure consistent API design across components
+- **Alternatives:**
+  - Defer fixes until later: Would allow faster progress on new features but accumulate technical debt
+  - Complete rewrite of problematic modules: More thorough but excessive for the issues identified
+  - Minimal fixes only for critical issues: Less comprehensive but faster
+  - Automated code quality tools only: Less manual effort but might miss context-specific issues
+- **Consequences:**
+  - Positive: Improved code quality and reliability
+  - Positive: Better testability of components
+  - Positive: More consistent API design across the codebase
+  - Positive: Reduced technical debt early in the project
+  - Positive: Clearer error handling and type safety
+  - Negative: Required time investment for fixes rather than new features
+  - Negative: Some fixes required changes to multiple components
+- **References:** activeContext.md, progress.md, src/database/part.rs, src/git_backend/directory.rs, src/database/schema.rs, Cargo.toml
+
+### DEC-017 - Tauri Desktop Application Implementation
+- **Date:** 2025-03-04
+- **Status:** Implemented
+- **Context:** The project needed to implement the Tauri desktop application framework to create a cross-platform desktop application that integrates the React frontend with the Rust backend.
+- **Decision:** Implement a comprehensive Tauri integration with the following components:
+  1. Create tauri.conf.json configuration file with appropriate settings
+  2. Implement Rust main.rs entry point for the Tauri application
+  3. Set up build.rs for Tauri build process
+  4. Configure Tauri commands for frontend-backend communication
+  5. Set up proper error handling for Tauri commands
+  6. Integrate existing Git backend with Tauri commands
+  7. Ensure proper state management with Tauri's State API
+- **Alternatives:**
+  - Electron: More widely used but has larger application size and higher memory usage
+  - Web application only: Simpler but lacks desktop integration features
+  - Native GUI frameworks (e.g., Qt): More native feel but steeper learning curve and less web technology integration
+  - Progressive Web App (PWA): Better than web-only but still limited in system access
+- **Consequences:**
+  - Positive: Smaller application size compared to Electron
+  - Positive: Better performance and lower memory usage
+  - Positive: Improved security through Rust's memory safety and Tauri's permissions model
+  - Positive: Cross-platform support (Windows, macOS, Linux)
+  - Positive: Seamless integration between React frontend and Rust backend
+  - Positive: Type-safe communication through Tauri Commands API
+  - Negative: Smaller ecosystem and community compared to Electron
+  - Negative: Some platform-specific features require additional implementation
+  - Negative: Requires careful state management between frontend and backend
+- **References:** tauri.conf.json, src/main.rs, build.rs, src/commands.rs, activeContext.md, progress.md

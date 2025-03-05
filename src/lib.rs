@@ -7,6 +7,7 @@
 
 pub mod git_backend;
 pub mod database;
+pub mod commands;
 
 /// Re-export the Git Backend Manager for easier access
 pub use git_backend::{
@@ -23,6 +24,16 @@ pub use git_backend::{
     UiStatus,
     UiCommitResult,
     Metadata,
+};
+
+/// Re-export the commands for easier access
+pub use commands::{
+    create_repository,
+    open_repository,
+    close_repository,
+    get_repository_info,
+    GitBackendState,
+    init_git_backend,
 };
 
 /// Re-export the Database types and managers for easier access
@@ -155,7 +166,7 @@ mod tests {
 
         // Create a new part
         let part = Part::new(
-            "ELE-RES-001".to_string(),
+            part_id,
             "Electronic".to_string(),
             "Resistor".to_string(),
             "10K Resistor".to_string(),
@@ -167,7 +178,7 @@ mod tests {
         assert!(result.is_ok());
 
         // Retrieve the part from the database
-        let retrieved_part = part_manager.get_part("ELE-RES-001").unwrap();
+        let retrieved_part = part_manager.get_part(part_id).unwrap();
 
         // Check that the retrieved part matches the original
         assert_eq!(retrieved_part.part_id, part.part_id);

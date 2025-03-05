@@ -372,12 +372,12 @@ mod tests {
         db_manager.initialize_schema().unwrap();
 
         // Create a part manager and a revision manager
-        let part_manager = PartManager::new(db_manager.connection());
+        let mut part_manager = PartManager::new(db_manager.connection());
         let revision_manager = RevisionManager::new(db_manager.connection());
 
         // Create a new part
         let part = Part::new(
-            "ELE-RES-001".to_string(),
+            10001, // Use a numeric part_id instead of a string
             "Electronic".to_string(),
             "Resistor".to_string(),
             "10K Resistor".to_string(),

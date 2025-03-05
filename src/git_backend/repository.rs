@@ -46,11 +46,14 @@ impl<'a> RepositoryManager<'a> {
             "parts",
             "parts/libraries",
             "templates",
+            "templates/readme",
+            "templates/database",
             "scripts",
             "config",
             "config/workflows",
             "config/categories",
             "config/directory-templates",
+            "config/directory-templates/custom",
             "config/settings",
         ];
         
@@ -128,6 +131,11 @@ vendor/
                 .map_err(|e| GitBackendError::IoError(e))?;
         }
         
+        // Create directory templates
+        let directory_manager = crate::git_backend::directory::DirectoryTemplateManager::new(repo_path, self.config);
+        directory_manager.create_default_templates()?;
+        directory_manager.create_readme_templates()?;
+        
         Ok(())
     }
     
@@ -183,6 +191,22 @@ vendor/
         Ok(())
     }
     
+    /// Creates a part directory with the specified template
+    pub fn create_part_directory(
+        &self,
+        part_number: &str,
+        category: &str,
+        subcategory: &str,
+        template_type: crate::git_backend::directory::TemplateType,
+    ) -> Result<std::path::PathBuf> {
+        let directory_manager = crate::git_backend::directory::DirectoryTemplateManager::new(
+            self.repo.path().parent().unwrap_or(std::path::Path::new("")),
+            self.config
+        );
+        
+        directory_manager.create_part_directory(part_number, category, subcategory, template_type)
+    }
+    
     /// Gets information about the repository
     pub fn get_info(&self) -> Result<RepositoryInfo> {
         // Get the repository path
@@ -205,10 +229,10 @@ vendor/
             .map_err(|e| GitBackendError::GitError(e))?;
         
         let has_changes = statuses.iter().any(|entry| {
-            entry.status().is_wt_modified() || 
-            entry.status().is_wt_deleted() || 
-            entry.status().is_wt_typechange() || 
-            entry.status().is_wt_renamed() || 
+            entry.status().is_wt_modified() ||
+            entry.status().is_wt_deleted() ||
+            entry.status().is_wt_typechange() ||
+            entry.status().is_wt_renamed() ||
             entry.status().is_wt_new()
         });
         
@@ -239,5 +263,84 @@ vendor/
             .map_err(|e| GitBackendError::IoError(e))?;
         
         Ok(content.contains("filter=lfs diff=lfs merge=lfs"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+    use crate::git_backend::GitBackendConfig;
+    use crate::git_backend::directory::TemplateType;
+
+    #[test]
+    fn test_setup_plm_structure() {
+        // Create a temporary directory for the test
+        let temp_dir = TempDir::new().unwrap();
+        let repo_path = temp_dir.path();
+        
+        // Initialize a Git repository
+        let repo = git2::Repository::init(repo_path).unwrap();
+        
+        // Create a repository manager
+        let config = GitBackendConfig::default();
+        let repo_manager = RepositoryManager::new(&repo, &config);
+        
+        // Set up the PLM structure
+        repo_manager.setup_plm_structure().unwrap();
+        
+        // Check that the directories were created
+        assert!(repo_path.join("parts").exists());
+        assert!(repo_path.join("templates").exists());
+        assert!(repo_path.join("scripts").exists());
+        assert!(repo_path.join("config").exists());
+        assert!(repo_path.join("config/directory-templates").exists());
+        
+        // Check that the .gitattributes file was created
+        assert!(repo_path.join(".gitattributes").exists());
+        
+        // Check that the .gitignore file was created
+        assert!(repo_path.join(".gitignore").exists());
+        
+        // Check that the directory templates were created
+        assert!(repo_path.join("config/directory-templates/minimal.json").exists());
+        assert!(repo_path.join("config/directory-templates/standard.json").exists());
+        assert!(repo_path.join("config/directory-templates/extended.json").exists());
+        
+        // Check that the README templates were created
+        assert!(repo_path.join("templates/readme/minimal.md").exists());
+        assert!(repo_path.join("templates/readme/standard.md").exists());
+        assert!(repo_path.join("templates/readme/extended.md").exists());
+    }
+    
+    #[test]
+    fn test_create_part_directory() {
+        // Create a temporary directory for the test
+        let temp_dir = TempDir::new().unwrap();
+        let repo_path = temp_dir.path();
+        
+        // Initialize a Git repository
+        let repo = git2::Repository::init(repo_path).unwrap();
+        
+        // Create a repository manager
+        let config = GitBackendConfig::default();
+        let repo_manager = RepositoryManager::new(&repo, &config);
+        
+        // Set up the PLM structure
+        repo_manager.setup_plm_structure().unwrap();
+        
+        // Create a part directory with the minimal template
+        let part_dir = repo_manager.create_part_directory("10001", "EL", "PCB", TemplateType::Minimal).unwrap();
+        
+        // Check that the part directory was created
+        assert!(part_dir.exists());
+        assert_eq!(part_dir, repo_path.join("parts/EL-PCB-10001"));
+        
+        // Check that the required directories were created
+        assert!(part_dir.join("design").exists());
+        
+        // Check that the required files were created
+        assert!(part_dir.join("README.md").exists());
+        assert!(part_dir.join("metadata.db").exists());
     }
 }

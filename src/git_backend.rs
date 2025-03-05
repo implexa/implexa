@@ -10,6 +10,7 @@ pub mod lfs;
 pub mod hook;
 pub mod conflict;
 pub mod auth;
+pub mod directory;
 
 use std::path::{Path, PathBuf};
 use git2::{Repository, Oid, Branch, Commit};
@@ -366,6 +367,27 @@ impl GitBackendManager {
     /// Gets the auth provider
     pub fn auth_provider(&self) -> &auth::AuthProvider {
         &self.auth_provider
+    }
+    
+    /// Gets the directory template manager for the specified repository
+    pub fn directory_template_manager<'a>(&'a self, repo: &'a Repository) -> directory::DirectoryTemplateManager<'a> {
+        let repo_path = repo.path().parent().unwrap_or(Path::new(""));
+        directory::DirectoryTemplateManager::new(repo_path, &self.config)
+    }
+    
+    /// Creates a new branch with the specified name
+    pub fn create_branch<'a>(&'a self, repo: &'a Repository, name: &str) -> Result<Branch<'a>> {
+        self.operation_handler(repo).create_branch(name)
+    }
+    
+    /// Switches to the specified branch
+    pub fn checkout_branch(&self, repo: &Repository, name: &str) -> Result<()> {
+        self.operation_handler(repo).checkout_branch(name)
+    }
+    
+    /// Merges the specified branch into the current branch
+    pub fn merge_branch(&self, repo: &Repository, name: &str) -> Result<MergeResult> {
+        self.operation_handler(repo).merge_branch(name)
     }
     
     /// Commits changes with metadata

@@ -112,13 +112,12 @@ impl Part {
 pub fn display_part_number(&self, connection: &rusqlite::Connection) -> String {
     Self::generate_display_part_number(connection, &self.category, &self.subcategory, self.part_id)
 }
-    }
 }
 
 /// Manager for part operations
 pub struct PartManager<'a> {
     /// Connection to the SQLite database
-    connection: &'a Connection,
+    connection: &'a mut Connection,
 }
 
 impl<'a> PartManager<'a> {
@@ -126,15 +125,14 @@ impl<'a> PartManager<'a> {
     ///
     /// # Arguments
     ///
-    /// * `connection` - Connection to the SQLite database
+    /// * `connection` - Mutable connection to the SQLite database
     ///
     /// # Returns
     ///
     /// A new PartManager instance
-    pub fn new(connection: &'a Connection) -> Self {
+    pub fn new(connection: &'a mut Connection) -> Self {
         Self { connection }
     }
-
     /// Get the next part ID from the sequence
     ///
     /// # Returns
@@ -145,7 +143,8 @@ impl<'a> PartManager<'a> {
     ///
     /// Returns a DatabaseError if the next part ID could not be retrieved
     pub fn get_next_part_id(&self) -> DatabaseResult<i64> {
-        let tx = self.connection.transaction()?;
+        // Create a transaction for atomicity
+        let mut tx = self.connection.transaction()?;
         
         // Get the current next_value
         let next_id: i64 = tx.query_row(
@@ -469,7 +468,7 @@ mod tests {
         db_manager.initialize_schema().unwrap();
 
         // Create a part manager
-        let part_manager = PartManager::new(db_manager.connection());
+        let mut part_manager = PartManager::new(db_manager.connection());
 
         // Get the next part ID
         let part_id = part_manager.get_next_part_id().unwrap();

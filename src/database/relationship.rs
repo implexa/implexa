@@ -360,12 +360,12 @@ mod tests {
         db_manager.initialize_schema().unwrap();
 
         // Create a part manager and a relationship manager
-        let part_manager = PartManager::new(db_manager.connection());
+        let mut part_manager = PartManager::new(db_manager.connection());
         let relationship_manager = RelationshipManager::new(db_manager.connection());
 
         // Create two parts
         let parent_part = Part::new(
-            "ASM-PCB-001".to_string(),
+            10002, // Use a numeric part_id instead of a string
             "Assembly".to_string(),
             "PCB".to_string(),
             "Main PCB Assembly".to_string(),
@@ -373,7 +373,7 @@ mod tests {
         );
 
         let child_part = Part::new(
-            "ELE-RES-001".to_string(),
+            10003, // Use a numeric part_id instead of a string
             "Electronic".to_string(),
             "Resistor".to_string(),
             "10K Resistor".to_string(),

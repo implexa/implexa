@@ -3,7 +3,7 @@
 //! This module provides functionality for managing the SQLite database schema,
 //! including initialization, migrations, and version management.
 
-use rusqlite::{Connection, Error as SqliteError};
+use rusqlite::{Connection, Error as SqliteError, params};
 use std::path::Path;
 use thiserror::Error;
 
@@ -404,13 +404,13 @@ impl DatabaseManager {
         Ok(version)
     }
 
-    /// Get a reference to the underlying SQLite connection
+    /// Get a mutable reference to the underlying SQLite connection
     ///
     /// # Returns
     ///
-    /// A reference to the SQLite connection
-    pub fn connection(&self) -> &Connection {
-        &self.connection
+    /// A mutable reference to the SQLite connection
+    pub fn connection(&mut self) -> &mut Connection {
+        &mut self.connection
     }
 }
 

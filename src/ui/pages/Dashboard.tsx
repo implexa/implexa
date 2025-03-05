@@ -1,7 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useParts } from '../context/PartsContext';
 import { useWorkspace } from '../context/WorkspaceContext';
+import { useRepository } from '../context/RepositoryContext';
+import { open } from '@tauri-apps/api/dialog';
 
 /**
  * Dashboard page component
@@ -10,12 +12,47 @@ import { useWorkspace } from '../context/WorkspaceContext';
 const Dashboard: React.FC = () => {
   const { parts, fetchParts } = useParts();
   const { workspaces, fetchWorkspaces } = useWorkspace();
+  const {
+    repository,
+    isLoading,
+    error,
+    createRepository,
+    openRepository,
+    closeRepository,
+    selectDirectoryTemplate,
+    selectedTemplate
+  } = useRepository();
+  
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [repoName, setRepoName] = useState('');
+  const [repoPath, setRepoPath] = useState('');
 
   // Fetch data on component mount
   useEffect(() => {
     fetchParts();
     fetchWorkspaces();
   }, [fetchParts, fetchWorkspaces]);
+  
+  // Handle repository creation
+  const handleCreateRepository = async () => {
+    if (!repoPath || !repoName) return;
+    
+    await createRepository(repoPath, repoName);
+    setShowCreateModal(false);
+  };
+  
+  // Handle repository path selection
+  const handleSelectPath = async () => {
+    const selected = await open({
+      directory: true,
+      multiple: false,
+      title: 'Select Parent Directory'
+    });
+    
+    if (selected && typeof selected === 'string') {
+      setRepoPath(selected);
+    }
+  };
 
   // Get recent parts (last 5)
   const recentParts = [...parts]
@@ -45,6 +82,77 @@ const Dashboard: React.FC = () => {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Dashboard</h1>
+
+      {/* Repository Section */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Repository</h2>
+        
+        {error && (
+          <div className="mb-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-md">
+            {error}
+          </div>
+        )}
+        
+        {isLoading ? (
+          <div className="flex justify-center items-center h-24">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          </div>
+        ) : repository ? (
+          <div className="space-y-4">
+            <div className="flex flex-col md:flex-row md:justify-between md:items-center">
+              <div>
+                <h3 className="text-md font-medium text-gray-800 dark:text-white">{repository.name}</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{repository.path}</p>
+              </div>
+              <div className="mt-2 md:mt-0">
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                  repository.hasChanges
+                    ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                    : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                }`}>
+                  {repository.hasChanges ? 'Uncommitted Changes' : 'Clean'}
+                </span>
+                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                  {repository.currentBranch}
+                </span>
+                {repository.lfsEnabled && (
+                  <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                    LFS Enabled
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <button
+                onClick={closeRepository}
+                className="px-3 py-1 text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
+              >
+                Close Repository
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              No repository is currently open. Create a new repository or open an existing one.
+            </p>
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              >
+                Create New Repository
+              </button>
+              <button
+                onClick={() => openRepository()}
+                className="px-4 py-2 bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+              >
+                Open Existing Repository
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Recent Activity */}
@@ -183,6 +291,92 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Create Repository Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Create New Repository</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="repoName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Repository Name
+                </label>
+                <input
+                  type="text"
+                  id="repoName"
+                  value={repoName}
+                  onChange={(e) => setRepoName(e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  placeholder="my-plm-repository"
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="repoPath" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Parent Directory
+                </label>
+                <div className="mt-1 flex rounded-md shadow-sm">
+                  <input
+                    type="text"
+                    id="repoPath"
+                    value={repoPath}
+                    readOnly
+                    className="block w-full rounded-l-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    placeholder="Select a directory..."
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSelectPath}
+                    className="inline-flex items-center px-3 py-2 border border-l-0 border-gray-300 dark:border-gray-600 rounded-r-md bg-gray-50 dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-500"
+                  >
+                    Browse
+                  </button>
+                </div>
+              </div>
+              
+              <div>
+                <label htmlFor="templateType" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Directory Template
+                </label>
+                <select
+                  id="templateType"
+                  value={selectedTemplate}
+                  onChange={(e) => selectDirectoryTemplate(e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                >
+                  <option value="minimal">Minimal - Essential directories only</option>
+                  <option value="standard">Standard - Commonly used directories (Default)</option>
+                  <option value="extended">Extended - All possible directories</option>
+                </select>
+              </div>
+            </div>
+            
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(false)}
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateRepository}
+                disabled={!repoPath || !repoName}
+                className={`px-4 py-2 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                  !repoPath || !repoName
+                    ? 'bg-blue-400 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                }`}
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

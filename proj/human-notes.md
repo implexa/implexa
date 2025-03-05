@@ -6,3 +6,10 @@
 - time in utc
 - part categories should be configurable in a cfg file
 
+
+
+# Roo Code
+- Less need ot update the decision log
+- get it to read the coding guidelines and prd every time
+- trim the progress log and context
+- review the first 15k tokens that get sent..

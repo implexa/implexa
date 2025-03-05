@@ -24,6 +24,10 @@ pub enum PartManagementError {
     #[error("Git backend error: {0}")]
     GitBackendError(#[from] GitBackendError),
     
+    /// SQLite error
+    #[error("SQLite error: {0}")]
+    SqliteError(#[from] rusqlite::Error),
+    
     /// Invalid state transition
     #[error("Invalid state transition: {0}")]
     InvalidStateTransition(String),
@@ -126,7 +130,7 @@ impl User {
 /// Manager for part management operations
 pub struct PartManagementManager<'a> {
     /// Connection to the SQLite database
-    connection: &'a Connection,
+    connection: &'a mut Connection,
     /// Git backend manager
     git_manager: &'a GitBackendManager,
     /// Current user
@@ -138,7 +142,7 @@ impl<'a> PartManagementManager<'a> {
     ///
     /// # Arguments
     ///
-    /// * `connection` - Connection to the SQLite database
+    /// * `connection` - Mutable connection to the SQLite database
     /// * `git_manager` - Git backend manager
     /// * `current_user` - Current user
     ///
@@ -146,7 +150,7 @@ impl<'a> PartManagementManager<'a> {
     ///
     /// A new PartManagementManager instance
     pub fn new(
-        connection: &'a Connection,
+        connection: &'a mut Connection,
         git_manager: &'a GitBackendManager,
         current_user: User,
     ) -> Self {
@@ -156,7 +160,6 @@ impl<'a> PartManagementManager<'a> {
             current_user,
         }
     }
-    
     /// Create a new part with initial metadata and set up Git branch
     ///
     /// # Arguments
@@ -175,7 +178,7 @@ impl<'a> PartManagementManager<'a> {
     ///
     /// Returns a PartManagementError if the part could not be created
     pub fn create_part(
-        &self,
+        &mut self,
         category: String,
         subcategory: String,
         name: String,
@@ -221,8 +224,10 @@ impl<'a> PartManagementManager<'a> {
         
         // Create a feature branch for the part
         let branch_name = format!("part/{}/draft", display_part_number);
-        self.git_manager.create_branch(repo_path, &branch_name)?;
-        self.git_manager.checkout_branch(repo_path, &branch_name)?;
+        // Open the repository first
+        let repo = self.git_manager.open_repository(repo_path)?;
+        self.git_manager.create_branch(&repo, &branch_name)?;
+        self.git_manager.checkout_branch(&repo, &branch_name)?;
         
         // Commit the transaction
         tx.commit()?;
@@ -246,7 +251,7 @@ impl<'a> PartManagementManager<'a> {
     ///
     /// Returns a PartManagementError if the part could not be submitted for review
     pub fn submit_for_review(
-        &self,
+        &mut self,
         revision_id: i64,
         repo_path: &Path,
         reviewers: Vec<String>,
@@ -287,8 +292,10 @@ impl<'a> PartManagementManager<'a> {
         let review_branch = format!("part/{}/review", display_part_number);
         
         // Create and checkout the review branch
-        self.git_manager.create_branch(repo_path, &review_branch)?;
-        self.git_manager.checkout_branch(repo_path, &review_branch)?;
+        // Open the repository first
+        let repo = self.git_manager.open_repository(repo_path)?;
+        self.git_manager.create_branch(&repo, &review_branch)?;
+        self.git_manager.checkout_branch(&repo, &review_branch)?;
         
         // Update the revision status to In Review
         revision_manager.update_status(revision_id, RevisionStatus::InReview)?;
@@ -325,7 +332,7 @@ impl<'a> PartManagementManager<'a> {
     ///
     /// Returns a PartManagementError if the revision could not be approved
     pub fn approve_revision(
-        &self,
+        &mut self,
         revision_id: i64,
         comments: Option<String>,
     ) -> PartManagementResult<()> {
@@ -400,7 +407,7 @@ impl<'a> PartManagementManager<'a> {
     ///
     /// Returns a PartManagementError if the revision could not be rejected
     pub fn reject_revision(
-        &self,
+        &mut self,
         revision_id: i64,
         comments: Option<String>,
     ) -> PartManagementResult<()> {
@@ -478,7 +485,7 @@ impl<'a> PartManagementManager<'a> {
     ///
     /// Returns a PartManagementError if the revision could not be released
     pub fn release_revision(
-        &self,
+        &mut self,
         revision_id: i64,
         repo_path: &Path,
     ) -> PartManagementResult<()> {
@@ -521,11 +528,13 @@ impl<'a> PartManagementManager<'a> {
         let display_part_number = part.display_part_number(&tx);
         
         // Checkout the main branch
-        self.git_manager.checkout_branch(repo_path, "main")?;
+        // Open the repository first
+        let repo = self.git_manager.open_repository(repo_path)?;
+        self.git_manager.checkout_branch(&repo, "main")?;
         
         // Merge the review branch into main
         let review_branch = format!("part/{}/review", display_part_number);
-        self.git_manager.merge_branch(repo_path, &review_branch)?;
+        self.git_manager.merge_branch(&repo, &review_branch)?;
         
         // Update the revision status to Released
         revision_manager.update_status(revision_id, RevisionStatus::Released)?;
@@ -550,7 +559,7 @@ impl<'a> PartManagementManager<'a> {
     ///
     /// Returns a PartManagementError if the revision could not be marked as obsolete
     pub fn mark_as_obsolete(
-        &self,
+        &mut self,
         revision_id: i64,
     ) -> PartManagementResult<()> {
         // Start a transaction
@@ -600,7 +609,7 @@ impl<'a> PartManagementManager<'a> {
     ///
     /// Returns a PartManagementError if the revision could not be created
     pub fn create_revision(
-        &self,
+        &mut self,
         part_id: i64,
         repo_path: &Path,
     ) -> PartManagementResult<i64> {
@@ -639,9 +648,11 @@ impl<'a> PartManagementManager<'a> {
         
         // Create a new feature branch from main
         let branch_name = format!("part/{}/draft", display_part_number);
-        self.git_manager.checkout_branch(repo_path, "main")?;
-        self.git_manager.create_branch(repo_path, &branch_name)?;
-        self.git_manager.checkout_branch(repo_path, &branch_name)?;
+        // Open the repository first
+        let repo = self.git_manager.open_repository(repo_path)?;
+        self.git_manager.checkout_branch(&repo, "main")?;
+        self.git_manager.create_branch(&repo, &branch_name)?;
+        self.git_manager.checkout_branch(&repo, &branch_name)?;
         
         // Create a new revision in Draft state
         let revision = Revision::new(
@@ -676,7 +687,7 @@ impl<'a> PartManagementManager<'a> {
     ///
     /// Returns a PartManagementError if the commit hash could not be updated
     pub fn update_commit_hash(
-        &self,
+        &mut self,
         revision_id: i64,
         commit_hash: &str,
     ) -> PartManagementResult<()> {
@@ -713,7 +724,7 @@ impl<'a> PartManagementManager<'a> {
     ///
     /// Returns a PartManagementError if the revisions could not be retrieved
     pub fn get_revisions_with_approvals(
-        &self,
+        &mut self,
         part_id: i64,
     ) -> PartManagementResult<Vec<(Revision, Vec<Approval>)>> {
         // Create managers
@@ -800,7 +811,7 @@ mod tests {
         let reviewer = User::new("reviewer".to_string(), UserRole::Designer);
         
         // Create a part management manager for the reviewer
-        let reviewer_mgmt = PartManagementManager::new(
+        let mut reviewer_mgmt = PartManagementManager::new(
             db_manager.connection(),
             &git_manager,
             reviewer,

@@ -1,55 +1,38 @@
 # Active Context
 
 ## Current Task
-Implementing the database connection management refactoring in the Implexa PLM codebase.
+Fixing error handling issues in the Implexa PLM codebase.
 
-## Database Connection Management Refactoring
-
-We've implemented the comprehensive solution for the database connection management issues that were encountered during testing. The key components of this implementation are:
+## Error Handling Refactoring Progress
 
 ### 1. Issues Addressed
-- Multiple mutable borrows of the same connection in test code
-- Type mismatches between `&Transaction` and `&mut Connection`
-- Inconsistent mutability requirements across manager structs
-- Difficulty in mocking database connections for testing
+- Identified and resolved issues with error type conversion between different error types
+- Fixed issues with multiple mutable borrows in the ConnectionManager
+- Resolved type mismatches between `&Transaction` and `&mut Connection`
+- Addressed inconsistent mutability requirements across manager structs
 
 ### 2. Implementation Progress
-- Created the `ConnectionManager` with interior mutability using `RefCell` in a new file `src/database/connection_manager.rs`
-- Updated `DatabaseManager` to use the `ConnectionManager`
-- Refactored the following manager structs to use the new approach:
-  - `PartManager`
-  - `RevisionManager`
-  - `RelationshipManager`
-  - `PartManagementManager`
-  - `PropertyManager`
-  - `ApprovalManager`
-  - `FileManager`
-  - `ManufacturerPartManager`
-  - `WorkflowManager`
-- Added transaction-specific methods for backward compatibility
-- Updated tests to use the new approach
-- Added support for mocking in tests
+- Modified the `ConnectionManager` to use generic error types instead of hardcoded `rusqlite::Error`
+- Added `DatabaseError::GitBackend` variant to allow conversion from `GitBackendError`
+- Fixed lifetime issue in `git_backend.rs` with the `create_branch` method
+- Updated multiple methods in `part_management.rs` to use explicit generic type parameters
+- Started updating the `workflow.rs` file with explicit type annotations
+- Fixed syntax and indentation issues in the code
 
-### 3. Implementation Details
-- Used interior mutability with `RefCell` to manage access to the database connection
-- Provided a consistent API for executing operations and managing transactions
-- Added methods for executing read-only operations, mutable operations, and transactions
-- Created transaction-specific methods for compatibility with existing code
-- Updated all manager structs to use the `ConnectionManager` instead of direct connection references
-- Refactored the `PartManagementManager` to use the `ConnectionManager` for all database operations
-- Updated the test code to use the new approach
+### 3. Remaining Tasks
+- Continue updating `workflow.rs` to add type annotations (lines 503, 533, 565, 588, 619, 645, 675)
+- Run cargo test again to see if any other issues remain
+- Fix any remaining error handling issues that might be uncovered in testing
+- Clean up unused imports across the codebase
 
-### 4. Benefits Achieved
-- Eliminated multiple mutable borrow issues through interior mutability
-- Provided a consistent API across all managers
-- Simplified transaction management
-- Improved testability with easier mocking
-- Maintained type safety and composability
-- Removed the need for mutable references to the connection in the `PartManagementManager`
-- Improved error handling with consistent error propagation
+### 4. Implementation Details
+- Used generic type parameters for error handling in ConnectionManager
+- Modified methods to explicitly specify error types in transaction blocks
+- Improved error conversion between different error types in the system
+- Fixed lifetime issues in the Git backend by implementing direct methods instead of calling through handlers
 
-## Next Steps
-- Implement missing transaction-specific methods in RevisionManager and other managers
-- Fix import issues in part_management.rs
-- Update test files to use connection_manager() instead of connection()
-- Verify that all tests pass with the new implementation
+### 5. Benefits Achieved
+- More flexible error handling with generic error types
+- Clearer error type conversion paths
+- Improved type inference with explicit type annotations
+- Fixed lifetime issues in Git backend operations

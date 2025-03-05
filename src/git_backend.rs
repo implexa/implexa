@@ -376,8 +376,12 @@ impl GitBackendManager {
     }
     
     /// Creates a new branch with the specified name
-    pub fn create_branch<'a>(&'a self, repo: &'a Repository, name: &str) -> Result<Branch<'a>> {
-        self.operation_handler(repo).create_branch(name)
+    pub fn create_branch<'a>(&self, repo: &'a Repository, name: &str) -> Result<Branch<'a>> {
+        // Directly call the operation method on the repository to avoid lifetime issues
+        let head = repo.head()?;
+        let commit = head.peel_to_commit()?;
+        let branch = repo.branch(name, &commit, false)?;
+        Ok(branch)
     }
     
     /// Switches to the specified branch

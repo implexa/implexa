@@ -254,7 +254,7 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflow could not be found
     pub fn get_workflow(&self, workflow_id: i64) -> DatabaseResult<Workflow> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let workflow = conn.query_row(
                 "SELECT workflow_id, name, description, active
                  FROM Workflows
@@ -280,7 +280,7 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflow could not be found
     pub fn get_workflow_by_name(&self, name: &str) -> DatabaseResult<Workflow> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let workflow = conn.query_row(
                 "SELECT workflow_id, name, description, active
                  FROM Workflows
@@ -302,7 +302,7 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflows could not be retrieved
     pub fn get_all_workflows(&self) -> DatabaseResult<Vec<Workflow>> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let mut stmt = conn.prepare(
                 "SELECT workflow_id, name, description, active
                  FROM Workflows
@@ -327,7 +327,7 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflows could not be retrieved
     pub fn get_active_workflows(&self) -> DatabaseResult<Vec<Workflow>> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let mut stmt = conn.prepare(
                 "SELECT workflow_id, name, description, active
                  FROM Workflows
@@ -361,7 +361,7 @@ impl<'a> WorkflowManager<'a> {
             DatabaseError::InitializationError("Workflow ID is required for update".to_string())
         })?;
 
-        self.connection_manager.execute_mut(|conn| {
+        self.connection_manager.execute_mut::<_, _, DatabaseError>(|conn| {
             conn.execute(
                 "UPDATE Workflows
                  SET name = ?2, description = ?3, active = ?4
@@ -391,7 +391,7 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflow could not be deleted
     pub fn delete_workflow(&self, workflow_id: i64) -> DatabaseResult<()> {
-        self.connection_manager.execute_mut(|conn| {
+        self.connection_manager.execute_mut::<_, _, DatabaseError>(|conn| {
             conn.execute(
                 "DELETE FROM Workflows WHERE workflow_id = ?1",
                 params![workflow_id],
@@ -414,7 +414,7 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflow state could not be created
     pub fn create_workflow_state(&self, state: &WorkflowState) -> DatabaseResult<i64> {
-        self.connection_manager.execute_mut(|conn| {
+        self.connection_manager.execute_mut::<_, _, DatabaseError>(|conn| {
             conn.execute(
                 "INSERT INTO WorkflowStates (workflow_id, name, description, is_initial, is_terminal)
                  VALUES (?1, ?2, ?3, ?4, ?5)",
@@ -444,7 +444,7 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflow state could not be found
     pub fn get_workflow_state(&self, state_id: i64) -> DatabaseResult<WorkflowState> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let state = conn.query_row(
                 "SELECT state_id, workflow_id, name, description, is_initial, is_terminal
                  FROM WorkflowStates
@@ -470,7 +470,7 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflow states could not be retrieved
     pub fn get_workflow_states(&self, workflow_id: i64) -> DatabaseResult<Vec<WorkflowState>> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let mut stmt = conn.prepare(
                 "SELECT state_id, workflow_id, name, description, is_initial, is_terminal
                  FROM WorkflowStates
@@ -684,7 +684,7 @@ impl<'a> WorkflowManager<'a> {
             for transition_result in transitions_iter {
                 transitions.push(transition_result?);
             }
-            Ok(transitions)
+            Ok::<Vec<WorkflowTransition>, rusqlite::Error>(transitions)
         }).map_err(DatabaseError::from)
     }
 
@@ -721,7 +721,7 @@ impl<'a> WorkflowManager<'a> {
                     transition.requires_approval,
                 ],
             )?;
-            Ok(())
+            Ok::<(), rusqlite::Error>(())
         }).map_err(DatabaseError::from)
     }
 
@@ -744,7 +744,7 @@ impl<'a> WorkflowManager<'a> {
                 "DELETE FROM WorkflowTransitions WHERE transition_id = ?1",
                 params![transition_id],
             )?;
-            Ok(())
+            Ok::<(), rusqlite::Error>(())
         }).map_err(DatabaseError::from)
     }
 
@@ -758,7 +758,7 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflow could not be created
     pub fn create_default_part_workflow(&self) -> DatabaseResult<i64> {
-        self.connection_manager.transaction(|tx| {
+        self.connection_manager.transaction::<_, _, DatabaseError>(|tx| {
             // Create the workflow
             let workflow = Workflow::new(
                 "Part Workflow".to_string(),
@@ -963,7 +963,7 @@ impl<'a> WorkflowManager<'a> {
                 ],
             )?;
 
-            Ok(workflow_id)
+            Ok::<i64, rusqlite::Error>(workflow_id)
         }).map_err(DatabaseError::from)
     }
 

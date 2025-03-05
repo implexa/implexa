@@ -41,10 +41,10 @@ impl ConnectionManager {
     ///
     /// # Errors
     ///
-    /// Returns a rusqlite::Error if the operation fails
-    pub fn execute<F, T>(&self, operation: F) -> Result<T, rusqlite::Error>
+    /// Returns an error from the operation
+    pub fn execute<F, T, E>(&self, operation: F) -> Result<T, E>
     where
-        F: FnOnce(&Connection) -> Result<T, rusqlite::Error>,
+        F: FnOnce(&Connection) -> Result<T, E>,
     {
         let conn = self.connection.borrow();
         operation(&conn)
@@ -62,10 +62,10 @@ impl ConnectionManager {
     ///
     /// # Errors
     ///
-    /// Returns a rusqlite::Error if the operation fails
-    pub fn execute_mut<F, T>(&self, operation: F) -> Result<T, rusqlite::Error>
+    /// Returns an error from the operation
+    pub fn execute_mut<F, T, E>(&self, operation: F) -> Result<T, E>
     where
-        F: FnOnce(&mut Connection) -> Result<T, rusqlite::Error>,
+        F: FnOnce(&mut Connection) -> Result<T, E>,
     {
         let mut conn = self.connection.borrow_mut();
         operation(&mut conn)
@@ -83,17 +83,18 @@ impl ConnectionManager {
     ///
     /// # Errors
     ///
-    /// Returns a rusqlite::Error if the operation fails
-    pub fn transaction<F, T>(&self, operation: F) -> Result<T, rusqlite::Error>
+    /// Returns an error from the operation or a rusqlite::Error if a transaction operation fails
+    pub fn transaction<F, T, E>(&self, operation: F) -> Result<T, E>
     where
-        F: FnOnce(&Transaction) -> Result<T, rusqlite::Error>,
+        F: FnOnce(&Transaction) -> Result<T, E>,
+        E: From<rusqlite::Error>,
     {
         let mut conn = self.connection.borrow_mut();
-        let tx = conn.transaction()?;
+        let tx = conn.transaction().map_err(E::from)?;
         let result = operation(&tx);
         match result {
             Ok(value) => {
-                tx.commit()?;
+                tx.commit().map_err(E::from)?;
                 Ok(value)
             }
             Err(err) => {
@@ -135,14 +136,15 @@ pub mod test_utils {
                 data: RefCell::new(HashMap::new()),
             }
         }
-
+        
         /// Execute a read-only operation with mock data
-        pub fn execute<F, T>(&self, operation: F) -> Result<T, rusqlite::Error>
+        pub fn execute<F, T, E>(&self, operation: F) -> Result<T, E>
         where
-            F: FnOnce(&Connection) -> Result<T, rusqlite::Error>,
+            F: FnOnce(&Connection) -> Result<T, E>,
+            E: From<rusqlite::Error>,
         {
             // Create an in-memory database for testing
-            let conn = Connection::open_in_memory()?;
+            let conn = Connection::open_in_memory().map_err(E::from)?;
             
             // Initialize with mock data
             // ...
@@ -151,12 +153,13 @@ pub mod test_utils {
         }
 
         /// Execute a mutable operation with mock data
-        pub fn execute_mut<F, T>(&self, operation: F) -> Result<T, rusqlite::Error>
+        pub fn execute_mut<F, T, E>(&self, operation: F) -> Result<T, E>
         where
-            F: FnOnce(&mut Connection) -> Result<T, rusqlite::Error>,
+            F: FnOnce(&mut Connection) -> Result<T, E>,
+            E: From<rusqlite::Error>,
         {
             // Create an in-memory database for testing
-            let mut conn = Connection::open_in_memory()?;
+            let mut conn = Connection::open_in_memory().map_err(E::from)?;
             
             // Initialize with mock data
             // ...
@@ -165,22 +168,23 @@ pub mod test_utils {
         }
 
         /// Execute an operation within a transaction with mock data
-        pub fn transaction<F, T>(&self, operation: F) -> Result<T, rusqlite::Error>
+        pub fn transaction<F, T, E>(&self, operation: F) -> Result<T, E>
         where
-            F: FnOnce(&Transaction) -> Result<T, rusqlite::Error>,
+            F: FnOnce(&Transaction) -> Result<T, E>,
+            E: From<rusqlite::Error>,
         {
             // Create an in-memory database for testing
-            let mut conn = Connection::open_in_memory()?;
+            let mut conn = Connection::open_in_memory().map_err(E::from)?;
             
             // Initialize with mock data
             // ...
             
-            let tx = conn.transaction()?;
+            let tx = conn.transaction().map_err(E::from)?;
             let result = operation(&tx);
             
             match result {
                 Ok(value) => {
-                    tx.commit()?;
+                    tx.commit().map_err(E::from)?;
                     Ok(value)
                 }
                 Err(err) => {

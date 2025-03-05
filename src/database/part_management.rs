@@ -194,7 +194,7 @@ impl<'a> PartManagementManager<'a> {
         }
         
         // Use a transaction for the entire operation
-        self.connection_manager.transaction(|tx| {
+        self.connection_manager.transaction::<_, _, PartManagementError>(|tx| {
             // Create part managers for this transaction
             let part_manager = PartManager::new_with_transaction(tx);
             let revision_manager = RevisionManager::new_with_transaction(tx);
@@ -234,7 +234,7 @@ impl<'a> PartManagementManager<'a> {
             self.git_manager.checkout_branch(&repo, &branch_name)?;
             
             Ok((part, revision_id))
-        }).map_err(|e| e.into())
+        })
     }
     
     /// Submit a part for review
@@ -258,7 +258,7 @@ impl<'a> PartManagementManager<'a> {
         repo_path: &Path,
         reviewers: Vec<String>,
     ) -> PartManagementResult<()> {
-        self.connection_manager.transaction(|tx| {
+        self.connection_manager.transaction::<_, _, PartManagementError>(|tx| {
             // Create managers
             let revision_manager = RevisionManager::new_with_transaction(tx);
             let approval_manager = ApprovalManager::new_with_transaction(tx);
@@ -312,7 +312,7 @@ impl<'a> PartManagementManager<'a> {
             }
             
             Ok(())
-        }).map_err(|e| e.into())
+        })
     }
     
     /// Approve a revision
@@ -334,7 +334,7 @@ impl<'a> PartManagementManager<'a> {
         revision_id: i64,
         comments: Option<String>,
     ) -> PartManagementResult<()> {
-        self.connection_manager.transaction(|tx| {
+        self.connection_manager.transaction::<_, _, PartManagementError>(|tx| {
             // Create managers
             let revision_manager = RevisionManager::new_with_transaction(tx);
             let approval_manager = ApprovalManager::new_with_transaction(tx);
@@ -385,7 +385,7 @@ impl<'a> PartManagementManager<'a> {
             )?;
             
             Ok(())
-        }).map_err(|e| e.into())
+        })
     }
     
     /// Reject a revision
@@ -407,7 +407,7 @@ impl<'a> PartManagementManager<'a> {
         revision_id: i64,
         comments: Option<String>,
     ) -> PartManagementResult<()> {
-        self.connection_manager.transaction(|tx| {
+        self.connection_manager.transaction::<_, _, PartManagementError>(|tx| {
             // Create managers
             let revision_manager = RevisionManager::new_with_transaction(tx);
             let approval_manager = ApprovalManager::new_with_transaction(tx);
@@ -461,7 +461,7 @@ impl<'a> PartManagementManager<'a> {
             revision_manager.update_status_in_transaction(revision_id, RevisionStatus::Draft, tx)?;
             
             Ok(())
-        }).map_err(|e| e.into())
+        })
     }
     
     /// Release a revision
@@ -483,7 +483,7 @@ impl<'a> PartManagementManager<'a> {
         revision_id: i64,
         repo_path: &Path,
     ) -> PartManagementResult<()> {
-        self.connection_manager.transaction(|tx| {
+        self.connection_manager.transaction::<_, _, PartManagementError>(|tx| {
             // Create managers
             let revision_manager = RevisionManager::new_with_transaction(tx);
             let approval_manager = ApprovalManager::new_with_transaction(tx);
@@ -532,7 +532,7 @@ impl<'a> PartManagementManager<'a> {
             revision_manager.update_status_in_transaction(revision_id, RevisionStatus::Released, tx)?;
             
             Ok(())
-        }).map_err(|e| e.into())
+        })
     }
     
     /// Mark a revision as obsolete
@@ -552,7 +552,7 @@ impl<'a> PartManagementManager<'a> {
         &self,
         revision_id: i64,
     ) -> PartManagementResult<()> {
-        self.connection_manager.transaction(|tx| {
+        self.connection_manager.transaction::<_, _, PartManagementError>(|tx| {
             // Create managers
             let revision_manager = RevisionManager::new_with_transaction(tx);
             
@@ -577,7 +577,7 @@ impl<'a> PartManagementManager<'a> {
             revision_manager.update_status_in_transaction(revision_id, RevisionStatus::Obsolete, tx)?;
             
             Ok(())
-        }).map_err(|e| e.into())
+        })
     }
     
     /// Create a new revision of a part
@@ -599,7 +599,7 @@ impl<'a> PartManagementManager<'a> {
         part_id: i64,
         repo_path: &Path,
     ) -> PartManagementResult<i64> {
-        self.connection_manager.transaction(|tx| {
+        self.connection_manager.transaction::<_, _, PartManagementError>(|tx| {
             // Create managers
             let part_manager = PartManager::new_with_transaction(tx);
             let revision_manager = RevisionManager::new_with_transaction(tx);
@@ -651,7 +651,7 @@ impl<'a> PartManagementManager<'a> {
             let revision_id = revision_manager.create_revision_in_transaction(&revision, tx)?;
             
             Ok(revision_id)
-        }).map_err(|e| e.into())
+        })
     }
     
     /// Update the commit hash for a revision
@@ -673,7 +673,7 @@ impl<'a> PartManagementManager<'a> {
         revision_id: i64,
         commit_hash: &str,
     ) -> PartManagementResult<()> {
-        self.connection_manager.transaction(|tx| {
+        self.connection_manager.transaction::<_, _, PartManagementError>(|tx| {
             // Create a revision manager
             let revision_manager = RevisionManager::new_with_transaction(tx);
             
@@ -691,7 +691,7 @@ impl<'a> PartManagementManager<'a> {
             revision_manager.update_commit_hash_in_transaction(revision_id, commit_hash, tx)?;
             
             Ok(())
-        }).map_err(|e| e.into())
+        })
     }
     
     /// Get all revisions for a part with their approval status
@@ -711,7 +711,7 @@ impl<'a> PartManagementManager<'a> {
         &self,
         part_id: i64,
     ) -> PartManagementResult<Vec<(Revision, Vec<Approval>)>> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, PartManagementError>(|conn| {
             // Create managers
             let revision_manager = RevisionManager::new(self.connection_manager);
             let approval_manager = ApprovalManager::new(self.connection_manager);
@@ -727,7 +727,7 @@ impl<'a> PartManagementManager<'a> {
             }
             
             Ok(result)
-        }).map_err(|e| e.into())
+        })
     }
 }
 

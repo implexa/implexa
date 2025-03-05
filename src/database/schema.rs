@@ -7,6 +7,7 @@ use rusqlite::{Connection, Error as SqliteError, params};
 use std::path::Path;
 use thiserror::Error;
 use crate::database::connection_manager::ConnectionManager;
+use crate::git_backend::GitBackendError;
 
 /// Errors that can occur during database operations
 #[derive(Error, Debug)]
@@ -26,6 +27,10 @@ pub enum DatabaseError {
     /// Migration error
     #[error("Migration error: {0}")]
     MigrationError(String),
+    
+    /// Git Backend error
+    #[error("Git backend error: {0}")]
+    GitBackend(#[from] GitBackendError),
 }
 
 /// Result type for database operations
@@ -74,7 +79,7 @@ impl DatabaseManager {
     /// Returns a DatabaseError if the schema initialization fails
     pub fn initialize_schema(&self) -> DatabaseResult<()> {
         // Use a transaction to ensure all schema changes are atomic
-        self.connection_manager.transaction(|tx| {
+        self.connection_manager.transaction::<_, _, DatabaseError>(|tx| {
 
         // Create SchemaVersion table
         tx.execute(
@@ -390,7 +395,7 @@ impl DatabaseManager {
             )?;
             
             Ok(())
-        }).map_err(|e| e.into())
+        })
     }
 
     /// Get the current schema version
@@ -403,14 +408,14 @@ impl DatabaseManager {
     ///
     /// Returns a DatabaseError if the version cannot be retrieved
     pub fn get_schema_version(&self) -> DatabaseResult<i64> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let version = conn.query_row(
                 "SELECT MAX(version) FROM SchemaVersion",
                 [],
                 |row| row.get(0),
             )?;
             Ok(version)
-        }).map_err(|e| e.into())
+        })
     }
 
     /// Get a reference to the connection manager
@@ -448,7 +453,7 @@ mod tests {
         // Check that all tables were created
         let tables = db_manager
             .connection_manager()
-            .execute(|conn| {
+            .execute::<_, _, DatabaseError>(|conn| {
                 let mut stmt = conn.prepare("SELECT name FROM sqlite_master WHERE type='table'")?;
                 let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
                 let mut tables = Vec::new();

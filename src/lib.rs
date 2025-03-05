@@ -42,6 +42,7 @@ pub use database::{
     DatabaseManager,
     DatabaseError,
     DatabaseResult,
+    ConnectionManager,
     
     // Part types and manager
     Part,
@@ -140,7 +141,7 @@ mod tests {
         let db_path = temp_dir.path().join("test.db");
 
         // Create a new database manager
-        let mut db_manager = DatabaseManager::new(&db_path).unwrap();
+        let db_manager = DatabaseManager::new(&db_path).unwrap();
 
         // Initialize the schema
         let result = db_manager.initialize_schema();
@@ -158,11 +159,14 @@ mod tests {
         let db_path = temp_dir.path().join("test.db");
 
         // Create a new database manager and initialize the schema
-        let mut db_manager = DatabaseManager::new(&db_path).unwrap();
+        let db_manager = DatabaseManager::new(&db_path).unwrap();
         db_manager.initialize_schema().unwrap();
 
         // Create a part manager
-        let part_manager = PartManager::new(db_manager.connection());
+        let part_manager = PartManager::new(db_manager.connection_manager());
+
+        // Get the next part ID
+        let part_id = part_manager.get_next_part_id().unwrap();
 
         // Create a new part
         let part = Part::new(

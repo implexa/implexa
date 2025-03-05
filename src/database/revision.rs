@@ -243,6 +243,31 @@ impl<'a> RevisionManager<'a> {
         }).map_err(DatabaseError::from)
     }
 
+    /// Get a revision by its ID within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `revision_id` - The ID of the revision to get
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// The revision with the specified ID
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the revision could not be found
+    pub fn get_revision_in_transaction(&self, revision_id: i64, tx: &Transaction) -> DatabaseResult<Revision> {
+        let revision = tx.query_row(
+            "SELECT revision_id, part_id, version, status, created_date, created_by, commit_hash
+             FROM Revisions
+             WHERE revision_id = ?1",
+            params![revision_id],
+            |row| self.row_to_revision(row),
+        )?;
+        Ok(revision)
+    }
+
     /// Get all revisions for a part
     ///
     /// # Arguments
@@ -301,6 +326,33 @@ impl<'a> RevisionManager<'a> {
         }).map_err(DatabaseError::from)
     }
 
+    /// Get the latest revision for a part within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `part_id` - The ID of the part
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// The latest revision for the specified part
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the revision could not be retrieved
+    pub fn get_latest_revision_in_transaction(&self, part_id: &str, tx: &Transaction) -> DatabaseResult<Revision> {
+        let revision = tx.query_row(
+            "SELECT revision_id, part_id, version, status, created_date, created_by, commit_hash
+             FROM Revisions
+             WHERE part_id = ?1
+             ORDER BY created_date DESC
+             LIMIT 1",
+            params![part_id],
+            |row| self.row_to_revision(row),
+        )?;
+        Ok(revision)
+    }
+
     /// Update the status of a revision
     ///
     /// # Arguments
@@ -327,6 +379,31 @@ impl<'a> RevisionManager<'a> {
         }).map_err(DatabaseError::from)
     }
 
+    /// Update the status of a revision within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `revision_id` - The ID of the revision
+    /// * `status` - The new status
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// Ok(()) if the status was successfully updated
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the status could not be updated
+    pub fn update_status_in_transaction(&self, revision_id: i64, status: RevisionStatus, tx: &Transaction) -> DatabaseResult<()> {
+        tx.execute(
+            "UPDATE Revisions
+             SET status = ?2
+             WHERE revision_id = ?1",
+            params![revision_id, status.to_str()],
+        )?;
+        Ok(())
+    }
+
     /// Update the commit hash of a revision
     ///
     /// # Arguments
@@ -351,6 +428,31 @@ impl<'a> RevisionManager<'a> {
             )?;
             Ok(())
         }).map_err(DatabaseError::from)
+    }
+
+    /// Update the commit hash of a revision within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `revision_id` - The ID of the revision
+    /// * `commit_hash` - The new commit hash
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// Ok(()) if the commit hash was successfully updated
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the commit hash could not be updated
+    pub fn update_commit_hash_in_transaction(&self, revision_id: i64, commit_hash: &str, tx: &Transaction) -> DatabaseResult<()> {
+        tx.execute(
+            "UPDATE Revisions
+             SET commit_hash = ?2
+             WHERE revision_id = ?1",
+            params![revision_id, commit_hash],
+        )?;
+        Ok(())
     }
 
     /// Get the next version number for a part
@@ -386,6 +488,40 @@ impl<'a> RevisionManager<'a> {
             // If no version exists or parsing failed, start with "1"
             Ok("1".to_string())
         }).map_err(DatabaseError::from)
+    }
+
+    /// Get the next version number for a part within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `part_id` - The ID of the part
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// The next version number
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the version number could not be determined
+    pub fn get_next_version_in_transaction(&self, part_id: &str, tx: &Transaction) -> DatabaseResult<String> {
+        let max_version: Option<String> = tx.query_row(
+            "SELECT MAX(version)
+             FROM Revisions
+             WHERE part_id = ?1",
+            params![part_id],
+            |row| row.get(0),
+        ).optional()?;
+
+        if let Some(version) = max_version {
+            // Parse the version and increment it
+            if let Ok(num) = version.parse::<u32>() {
+                return Ok((num + 1).to_string());
+            }
+        }
+
+        // If no version exists or parsing failed, start with "1"
+        Ok("1".to_string())
     }
 
     /// Convert a database row to a Revision

@@ -240,6 +240,31 @@ impl<'a> ApprovalManager<'a> {
         }).map_err(DatabaseError::from)
     }
 
+    /// Get an approval by its ID within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `approval_id` - The ID of the approval to get
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// The approval with the specified ID
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the approval could not be found
+    pub fn get_approval_in_transaction(&self, approval_id: i64, tx: &Transaction) -> DatabaseResult<Approval> {
+        let approval = tx.query_row(
+            "SELECT approval_id, revision_id, approver, status, date, comments
+             FROM Approvals
+             WHERE approval_id = ?1",
+            params![approval_id],
+            |row| self.row_to_approval(row),
+        )?;
+        Ok(approval)
+    }
+
     /// Get all approvals for a revision
     ///
     /// # Arguments
@@ -270,6 +295,35 @@ impl<'a> ApprovalManager<'a> {
         }).map_err(DatabaseError::from)
     }
 
+    /// Get all approvals for a revision within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `revision_id` - The ID of the revision
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// A vector of approvals for the specified revision
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the approvals could not be retrieved
+    pub fn get_approvals_for_revision_in_transaction(&self, revision_id: i64, tx: &Transaction) -> DatabaseResult<Vec<Approval>> {
+        let mut stmt = tx.prepare(
+            "SELECT approval_id, revision_id, approver, status, date, comments
+             FROM Approvals
+             WHERE revision_id = ?1
+             ORDER BY approver",
+        )?;
+        let approvals_iter = stmt.query_map(params![revision_id], |row| self.row_to_approval(row))?;
+        let mut approvals = Vec::new();
+        for approval_result in approvals_iter {
+            approvals.push(approval_result?);
+        }
+        Ok(approvals)
+    }
+
     /// Get an approval for a specific revision and approver
     ///
     /// # Arguments
@@ -295,6 +349,32 @@ impl<'a> ApprovalManager<'a> {
             )?;
             Ok(approval)
         }).map_err(DatabaseError::from)
+    }
+
+    /// Get an approval for a specific revision and approver within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `revision_id` - The ID of the revision
+    /// * `approver` - The approver
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// The approval for the specified revision and approver
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the approval could not be found
+    pub fn get_approval_for_revision_and_approver_in_transaction(&self, revision_id: i64, approver: &str, tx: &Transaction) -> DatabaseResult<Approval> {
+        let approval = tx.query_row(
+            "SELECT approval_id, revision_id, approver, status, date, comments
+             FROM Approvals
+             WHERE revision_id = ?1 AND approver = ?2",
+            params![revision_id, approver],
+            |row| self.row_to_approval(row),
+        )?;
+        Ok(approval)
     }
 
     /// Update the status of an approval
@@ -446,6 +526,36 @@ impl<'a> ApprovalManager<'a> {
     /// Returns a DatabaseError if the approval status could not be determined
     pub fn is_revision_approved(&self, revision_id: i64) -> DatabaseResult<bool> {
         let approvals = self.get_approvals_for_revision(revision_id)?;
+        
+        if approvals.is_empty() {
+            return Ok(false);
+        }
+
+        for approval in &approvals {
+            if approval.status != ApprovalStatus::Approved {
+                return Ok(false);
+            }
+        }
+
+        Ok(true)
+    }
+
+    /// Check if a revision is fully approved within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `revision_id` - The ID of the revision
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// true if all approvals for the revision are approved, false otherwise
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the approval status could not be determined
+    pub fn is_revision_approved_in_transaction(&self, revision_id: i64, tx: &Transaction) -> DatabaseResult<bool> {
+        let approvals = self.get_approvals_for_revision_in_transaction(revision_id, tx)?;
         
         if approvals.is_empty() {
             return Ok(false);

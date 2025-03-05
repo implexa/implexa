@@ -361,6 +361,31 @@ impl<'a> PartManager<'a> {
         }).map_err(DatabaseError::from)
     }
 
+    /// Get a part by its ID within an existing transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `part_id` - The ID of the part to get
+    /// * `tx` - Transaction to use for database operations
+    ///
+    /// # Returns
+    ///
+    /// The part with the specified ID
+    ///
+    /// # Errors
+    ///
+    /// Returns a DatabaseError if the part could not be found
+    pub fn get_part_in_transaction(&self, part_id: i64, tx: &Transaction) -> DatabaseResult<Part> {
+        let part = tx.query_row(
+            "SELECT part_id, category, subcategory, name, description, created_date, modified_date
+             FROM Parts
+             WHERE part_id = ?1",
+            params![part_id],
+            |row| self.row_to_part(row),
+        )?;
+        Ok(part)
+    }
+
     /// Get all parts
     ///
     /// # Returns

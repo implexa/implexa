@@ -2,8 +2,9 @@
 //!
 //! This module provides functionality for managing categories and subcategories in the database.
 
-use rusqlite::{Connection, params, Row, Result as SqliteResult};
+use rusqlite::{Connection, Transaction, params, Row, Result as SqliteResult};
 use crate::database::schema::DatabaseResult;
+use crate::database::connection_manager::ConnectionManager;
 
 /// Represents a category in the system
 #[derive(Debug, Clone)]
@@ -81,8 +82,8 @@ impl Subcategory {
 
 /// Manager for category and subcategory operations
 pub struct CategoryManager<'a> {
-    /// Connection to the SQLite database
-    connection: &'a Connection,
+    /// Connection manager for the SQLite database
+    connection_manager: &'a ConnectionManager,
 }
 
 impl<'a> CategoryManager<'a> {
@@ -90,13 +91,13 @@ impl<'a> CategoryManager<'a> {
     ///
     /// # Arguments
     ///
-    /// * `connection` - Connection to the SQLite database
+    /// * `connection_manager` - Connection manager for the SQLite database
     ///
     /// # Returns
     ///
     /// A new CategoryManager instance
-    pub fn new(connection: &'a Connection) -> Self {
-        Self { connection }
+    pub fn new(connection_manager: &'a ConnectionManager) -> Self {
+        Self { connection_manager }
     }
 
     /// Create a new category in the database
@@ -113,16 +114,18 @@ impl<'a> CategoryManager<'a> {
     ///
     /// Returns a DatabaseError if the category could not be created
     pub fn create_category(&self, category: &Category) -> DatabaseResult<i64> {
-        self.connection.execute(
-            "INSERT INTO Categories (name, code, description)
-             VALUES (?1, ?2, ?3)",
-            params![
-                category.name,
-                category.code,
-                category.description,
-            ],
-        )?;
-        Ok(self.connection.last_insert_rowid())
+        self.connection_manager.execute_mut(|conn| {
+            conn.execute(
+                "INSERT INTO Categories (name, code, description)
+                 VALUES (?1, ?2, ?3)",
+                params![
+                    category.name,
+                    category.code,
+                    category.description,
+                ],
+            )?;
+            Ok(conn.last_insert_rowid())
+        })
     }
 
     /// Get a category by its ID
@@ -139,14 +142,16 @@ impl<'a> CategoryManager<'a> {
     ///
     /// Returns a DatabaseError if the category could not be found
     pub fn get_category(&self, category_id: i64) -> DatabaseResult<Category> {
-        let category = self.connection.query_row(
-            "SELECT category_id, name, code, description
-             FROM Categories
-             WHERE category_id = ?1",
-            params![category_id],
-            |row| self.row_to_category(row),
-        )?;
-        Ok(category)
+        self.connection_manager.execute(|conn| {
+            let category = conn.query_row(
+                "SELECT category_id, name, code, description
+                 FROM Categories
+                 WHERE category_id = ?1",
+                params![category_id],
+                |row| self.row_to_category(row),
+            )?;
+            Ok(category)
+        })
     }
 
     /// Get a category by its code
@@ -163,14 +168,16 @@ impl<'a> CategoryManager<'a> {
     ///
     /// Returns a DatabaseError if the category could not be found
     pub fn get_category_by_code(&self, code: &str) -> DatabaseResult<Category> {
-        let category = self.connection.query_row(
-            "SELECT category_id, name, code, description
-             FROM Categories
-             WHERE code = ?1",
-            params![code],
-            |row| self.row_to_category(row),
-        )?;
-        Ok(category)
+        self.connection_manager.execute(|conn| {
+            let category = conn.query_row(
+                "SELECT category_id, name, code, description
+                 FROM Categories
+                 WHERE code = ?1",
+                params![code],
+                |row| self.row_to_category(row),
+            )?;
+            Ok(category)
+        })
     }
 
     /// Get all categories
@@ -183,17 +190,19 @@ impl<'a> CategoryManager<'a> {
     ///
     /// Returns a DatabaseError if the categories could not be retrieved
     pub fn get_all_categories(&self) -> DatabaseResult<Vec<Category>> {
-        let mut stmt = self.connection.prepare(
-            "SELECT category_id, name, code, description
-             FROM Categories
-             ORDER BY name",
-        )?;
-        let categories_iter = stmt.query_map([], |row| self.row_to_category(row))?;
-        let mut categories = Vec::new();
-        for category_result in categories_iter {
-            categories.push(category_result?);
-        }
-        Ok(categories)
+        self.connection_manager.execute(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT category_id, name, code, description
+                 FROM Categories
+                 ORDER BY name",
+            )?;
+            let categories_iter = stmt.query_map([], |row| self.row_to_category(row))?;
+            let mut categories = Vec::new();
+            for category_result in categories_iter {
+                categories.push(category_result?);
+            }
+            Ok(categories)
+        })
     }
 
     /// Update a category
@@ -214,18 +223,20 @@ impl<'a> CategoryManager<'a> {
             rusqlite::Error::InvalidParameterName("Category ID is required for update".to_string())
         })?;
 
-        self.connection.execute(
-            "UPDATE Categories
-             SET name = ?2, code = ?3, description = ?4
-             WHERE category_id = ?1",
-            params![
-                category_id,
-                category.name,
-                category.code,
-                category.description,
-            ],
-        )?;
-        Ok(())
+        self.connection_manager.execute_mut(|conn| {
+            conn.execute(
+                "UPDATE Categories
+                 SET name = ?2, code = ?3, description = ?4
+                 WHERE category_id = ?1",
+                params![
+                    category_id,
+                    category.name,
+                    category.code,
+                    category.description,
+                ],
+            )?;
+            Ok(())
+        })
     }
 
     /// Delete a category
@@ -242,11 +253,13 @@ impl<'a> CategoryManager<'a> {
     ///
     /// Returns a DatabaseError if the category could not be deleted
     pub fn delete_category(&self, category_id: i64) -> DatabaseResult<()> {
-        self.connection.execute(
-            "DELETE FROM Categories WHERE category_id = ?1",
-            params![category_id],
-        )?;
-        Ok(())
+        self.connection_manager.execute_mut(|conn| {
+            conn.execute(
+                "DELETE FROM Categories WHERE category_id = ?1",
+                params![category_id],
+            )?;
+            Ok(())
+        })
     }
 
     /// Create a new subcategory in the database
@@ -263,17 +276,19 @@ impl<'a> CategoryManager<'a> {
     ///
     /// Returns a DatabaseError if the subcategory could not be created
     pub fn create_subcategory(&self, subcategory: &Subcategory) -> DatabaseResult<i64> {
-        self.connection.execute(
-            "INSERT INTO Subcategories (category_id, name, code, description)
-             VALUES (?1, ?2, ?3, ?4)",
-            params![
-                subcategory.category_id,
-                subcategory.name,
-                subcategory.code,
-                subcategory.description,
-            ],
-        )?;
-        Ok(self.connection.last_insert_rowid())
+        self.connection_manager.execute_mut(|conn| {
+            conn.execute(
+                "INSERT INTO Subcategories (category_id, name, code, description)
+                 VALUES (?1, ?2, ?3, ?4)",
+                params![
+                    subcategory.category_id,
+                    subcategory.name,
+                    subcategory.code,
+                    subcategory.description,
+                ],
+            )?;
+            Ok(conn.last_insert_rowid())
+        })
     }
 
     /// Get a subcategory by its ID
@@ -290,14 +305,16 @@ impl<'a> CategoryManager<'a> {
     ///
     /// Returns a DatabaseError if the subcategory could not be found
     pub fn get_subcategory(&self, subcategory_id: i64) -> DatabaseResult<Subcategory> {
-        let subcategory = self.connection.query_row(
-            "SELECT subcategory_id, category_id, name, code, description
-             FROM Subcategories
-             WHERE subcategory_id = ?1",
-            params![subcategory_id],
-            |row| self.row_to_subcategory(row),
-        )?;
-        Ok(subcategory)
+        self.connection_manager.execute(|conn| {
+            let subcategory = conn.query_row(
+                "SELECT subcategory_id, category_id, name, code, description
+                 FROM Subcategories
+                 WHERE subcategory_id = ?1",
+                params![subcategory_id],
+                |row| self.row_to_subcategory(row),
+            )?;
+            Ok(subcategory)
+        })
     }
 
     /// Get a subcategory by its code and category ID
@@ -315,14 +332,16 @@ impl<'a> CategoryManager<'a> {
     ///
     /// Returns a DatabaseError if the subcategory could not be found
     pub fn get_subcategory_by_code(&self, category_id: i64, code: &str) -> DatabaseResult<Subcategory> {
-        let subcategory = self.connection.query_row(
-            "SELECT subcategory_id, category_id, name, code, description
-             FROM Subcategories
-             WHERE category_id = ?1 AND code = ?2",
-            params![category_id, code],
-            |row| self.row_to_subcategory(row),
-        )?;
-        Ok(subcategory)
+        self.connection_manager.execute(|conn| {
+            let subcategory = conn.query_row(
+                "SELECT subcategory_id, category_id, name, code, description
+                 FROM Subcategories
+                 WHERE category_id = ?1 AND code = ?2",
+                params![category_id, code],
+                |row| self.row_to_subcategory(row),
+            )?;
+            Ok(subcategory)
+        })
     }
 
     /// Get all subcategories for a category
@@ -339,18 +358,20 @@ impl<'a> CategoryManager<'a> {
     ///
     /// Returns a DatabaseError if the subcategories could not be retrieved
     pub fn get_subcategories_for_category(&self, category_id: i64) -> DatabaseResult<Vec<Subcategory>> {
-        let mut stmt = self.connection.prepare(
-            "SELECT subcategory_id, category_id, name, code, description
-             FROM Subcategories
-             WHERE category_id = ?1
-             ORDER BY name",
-        )?;
-        let subcategories_iter = stmt.query_map(params![category_id], |row| self.row_to_subcategory(row))?;
-        let mut subcategories = Vec::new();
-        for subcategory_result in subcategories_iter {
-            subcategories.push(subcategory_result?);
-        }
-        Ok(subcategories)
+        self.connection_manager.execute(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT subcategory_id, category_id, name, code, description
+                 FROM Subcategories
+                 WHERE category_id = ?1
+                 ORDER BY name",
+            )?;
+            let subcategories_iter = stmt.query_map(params![category_id], |row| self.row_to_subcategory(row))?;
+            let mut subcategories = Vec::new();
+            for subcategory_result in subcategories_iter {
+                subcategories.push(subcategory_result?);
+            }
+            Ok(subcategories)
+        })
     }
 
     /// Update a subcategory
@@ -371,19 +392,21 @@ impl<'a> CategoryManager<'a> {
             rusqlite::Error::InvalidParameterName("Subcategory ID is required for update".to_string())
         })?;
 
-        self.connection.execute(
-            "UPDATE Subcategories
-             SET category_id = ?2, name = ?3, code = ?4, description = ?5
-             WHERE subcategory_id = ?1",
-            params![
-                subcategory_id,
-                subcategory.category_id,
-                subcategory.name,
-                subcategory.code,
-                subcategory.description,
-            ],
-        )?;
-        Ok(())
+        self.connection_manager.execute_mut(|conn| {
+            conn.execute(
+                "UPDATE Subcategories
+                 SET category_id = ?2, name = ?3, code = ?4, description = ?5
+                 WHERE subcategory_id = ?1",
+                params![
+                    subcategory_id,
+                    subcategory.category_id,
+                    subcategory.name,
+                    subcategory.code,
+                    subcategory.description,
+                ],
+            )?;
+            Ok(())
+        })
     }
 
     /// Delete a subcategory
@@ -400,11 +423,13 @@ impl<'a> CategoryManager<'a> {
     ///
     /// Returns a DatabaseError if the subcategory could not be deleted
     pub fn delete_subcategory(&self, subcategory_id: i64) -> DatabaseResult<()> {
-        self.connection.execute(
-            "DELETE FROM Subcategories WHERE subcategory_id = ?1",
-            params![subcategory_id],
-        )?;
-        Ok(())
+        self.connection_manager.execute_mut(|conn| {
+            conn.execute(
+                "DELETE FROM Subcategories WHERE subcategory_id = ?1",
+                params![subcategory_id],
+            )?;
+            Ok(())
+        })
     }
 
     /// Convert a database row to a Category
@@ -466,11 +491,11 @@ mod tests {
         let db_path = temp_dir.path().join("test.db");
 
         // Create a new database manager and initialize the schema
-        let mut db_manager = DatabaseManager::new(&db_path).unwrap();
+        let db_manager = DatabaseManager::new(&db_path).unwrap();
         db_manager.initialize_schema().unwrap();
 
         // Create a category manager
-        let category_manager = CategoryManager::new(db_manager.connection());
+        let category_manager = CategoryManager::new(db_manager.connection_manager());
 
         // Create a new category
         let category = Category::new(

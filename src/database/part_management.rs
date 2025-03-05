@@ -11,6 +11,7 @@ use crate::database::revision::{Revision, RevisionStatus, RevisionManager};
 use crate::database::approval::{Approval, ApprovalStatus, ApprovalManager};
 use crate::database::workflow::{WorkflowManager};
 use crate::git_backend::{GitBackendManager, GitBackendError};
+use crate::database::connection_manager::ConnectionManager;
 use std::path::Path;
 
 /// Error types specific to part management

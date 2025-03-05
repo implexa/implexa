@@ -302,17 +302,19 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflows could not be retrieved
     pub fn get_all_workflows(&self) -> DatabaseResult<Vec<Workflow>> {
-        let mut stmt = self.connection.prepare(
-            "SELECT workflow_id, name, description, active
-             FROM Workflows
-             ORDER BY name",
-        )?;
-        let workflows_iter = stmt.query_map([], |row| self.row_to_workflow(row))?;
-        let mut workflows = Vec::new();
-        for workflow_result in workflows_iter {
-            workflows.push(workflow_result?);
-        }
-        Ok(workflows)
+        self.connection_manager.execute(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT workflow_id, name, description, active
+                 FROM Workflows
+                 ORDER BY name",
+            )?;
+            let workflows_iter = stmt.query_map([], |row| self.row_to_workflow(row))?;
+            let mut workflows = Vec::new();
+            for workflow_result in workflows_iter {
+                workflows.push(workflow_result?);
+            }
+            Ok(workflows)
+        }).map_err(DatabaseError::from)
     }
 
     /// Get all active workflows
@@ -325,18 +327,20 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflows could not be retrieved
     pub fn get_active_workflows(&self) -> DatabaseResult<Vec<Workflow>> {
-        let mut stmt = self.connection.prepare(
-            "SELECT workflow_id, name, description, active
-             FROM Workflows
-             WHERE active = 1
-             ORDER BY name",
-        )?;
-        let workflows_iter = stmt.query_map([], |row| self.row_to_workflow(row))?;
-        let mut workflows = Vec::new();
-        for workflow_result in workflows_iter {
-            workflows.push(workflow_result?);
-        }
-        Ok(workflows)
+        self.connection_manager.execute(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT workflow_id, name, description, active
+                 FROM Workflows
+                 WHERE active = 1
+                 ORDER BY name",
+            )?;
+            let workflows_iter = stmt.query_map([], |row| self.row_to_workflow(row))?;
+            let mut workflows = Vec::new();
+            for workflow_result in workflows_iter {
+                workflows.push(workflow_result?);
+            }
+            Ok(workflows)
+        }).map_err(DatabaseError::from)
     }
 
     /// Update a workflow
@@ -357,18 +361,20 @@ impl<'a> WorkflowManager<'a> {
             DatabaseError::InitializationError("Workflow ID is required for update".to_string())
         })?;
 
-        self.connection.execute(
-            "UPDATE Workflows
-             SET name = ?2, description = ?3, active = ?4
-             WHERE workflow_id = ?1",
-            params![
-                workflow_id,
-                workflow.name,
-                workflow.description,
-                workflow.active,
-            ],
-        )?;
-        Ok(())
+        self.connection_manager.execute_mut(|conn| {
+            conn.execute(
+                "UPDATE Workflows
+                 SET name = ?2, description = ?3, active = ?4
+                 WHERE workflow_id = ?1",
+                params![
+                    workflow_id,
+                    workflow.name,
+                    workflow.description,
+                    workflow.active,
+                ],
+            )?;
+            Ok(())
+        }).map_err(DatabaseError::from)
     }
 
     /// Delete a workflow
@@ -385,11 +391,13 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflow could not be deleted
     pub fn delete_workflow(&self, workflow_id: i64) -> DatabaseResult<()> {
-        self.connection.execute(
-            "DELETE FROM Workflows WHERE workflow_id = ?1",
-            params![workflow_id],
-        )?;
-        Ok(())
+        self.connection_manager.execute_mut(|conn| {
+            conn.execute(
+                "DELETE FROM Workflows WHERE workflow_id = ?1",
+                params![workflow_id],
+            )?;
+            Ok(())
+        }).map_err(DatabaseError::from)
     }
 
     /// Create a new workflow state in the database
@@ -406,18 +414,20 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflow state could not be created
     pub fn create_workflow_state(&self, state: &WorkflowState) -> DatabaseResult<i64> {
-        self.connection.execute(
-            "INSERT INTO WorkflowStates (workflow_id, name, description, is_initial, is_terminal)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![
-                state.workflow_id,
-                state.name,
-                state.description,
-                state.is_initial,
-                state.is_terminal,
-            ],
-        )?;
-        Ok(self.connection.last_insert_rowid())
+        self.connection_manager.execute_mut(|conn| {
+            conn.execute(
+                "INSERT INTO WorkflowStates (workflow_id, name, description, is_initial, is_terminal)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![
+                    state.workflow_id,
+                    state.name,
+                    state.description,
+                    state.is_initial,
+                    state.is_terminal,
+                ],
+            )?;
+            Ok(conn.last_insert_rowid())
+        }).map_err(DatabaseError::from)
     }
 
     /// Get a workflow state by its ID
@@ -434,14 +444,16 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflow state could not be found
     pub fn get_workflow_state(&self, state_id: i64) -> DatabaseResult<WorkflowState> {
-        let state = self.connection.query_row(
-            "SELECT state_id, workflow_id, name, description, is_initial, is_terminal
-             FROM WorkflowStates
-             WHERE state_id = ?1",
-            params![state_id],
-            |row| self.row_to_workflow_state(row),
-        )?;
-        Ok(state)
+        self.connection_manager.execute(|conn| {
+            let state = conn.query_row(
+                "SELECT state_id, workflow_id, name, description, is_initial, is_terminal
+                 FROM WorkflowStates
+                 WHERE state_id = ?1",
+                params![state_id],
+                |row| self.row_to_workflow_state(row),
+            )?;
+            Ok(state)
+        }).map_err(DatabaseError::from)
     }
 
     /// Get all workflow states for a workflow
@@ -458,18 +470,20 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflow states could not be retrieved
     pub fn get_workflow_states(&self, workflow_id: i64) -> DatabaseResult<Vec<WorkflowState>> {
-        let mut stmt = self.connection.prepare(
-            "SELECT state_id, workflow_id, name, description, is_initial, is_terminal
-             FROM WorkflowStates
-             WHERE workflow_id = ?1
-             ORDER BY name",
-        )?;
-        let states_iter = stmt.query_map(params![workflow_id], |row| self.row_to_workflow_state(row))?;
-        let mut states = Vec::new();
-        for state_result in states_iter {
-            states.push(state_result?);
-        }
-        Ok(states)
+        self.connection_manager.execute(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT state_id, workflow_id, name, description, is_initial, is_terminal
+                 FROM WorkflowStates
+                 WHERE workflow_id = ?1
+                 ORDER BY name",
+            )?;
+            let states_iter = stmt.query_map(params![workflow_id], |row| self.row_to_workflow_state(row))?;
+            let mut states = Vec::new();
+            for state_result in states_iter {
+                states.push(state_result?);
+            }
+            Ok(states)
+        }).map_err(DatabaseError::from)
     }
 
     /// Get the initial state for a workflow
@@ -486,14 +500,16 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the initial state could not be found
     pub fn get_initial_state(&self, workflow_id: i64) -> DatabaseResult<WorkflowState> {
-        let state = self.connection.query_row(
-            "SELECT state_id, workflow_id, name, description, is_initial, is_terminal
-             FROM WorkflowStates
-             WHERE workflow_id = ?1 AND is_initial = 1",
-            params![workflow_id],
-            |row| self.row_to_workflow_state(row),
-        )?;
-        Ok(state)
+        self.connection_manager.execute(|conn| {
+            let state = conn.query_row(
+                "SELECT state_id, workflow_id, name, description, is_initial, is_terminal
+                 FROM WorkflowStates
+                 WHERE workflow_id = ?1 AND is_initial = 1",
+                params![workflow_id],
+                |row| self.row_to_workflow_state(row),
+            )?;
+            Ok(state)
+        }).map_err(DatabaseError::from)
     }
 
     /// Update a workflow state
@@ -514,20 +530,22 @@ impl<'a> WorkflowManager<'a> {
             DatabaseError::InitializationError("Workflow State ID is required for update".to_string())
         })?;
 
-        self.connection.execute(
-            "UPDATE WorkflowStates
-             SET workflow_id = ?2, name = ?3, description = ?4, is_initial = ?5, is_terminal = ?6
-             WHERE state_id = ?1",
-            params![
-                state_id,
-                state.workflow_id,
-                state.name,
-                state.description,
-                state.is_initial,
-                state.is_terminal,
-            ],
-        )?;
-        Ok(())
+        self.connection_manager.execute_mut(|conn| {
+            conn.execute(
+                "UPDATE WorkflowStates
+                 SET workflow_id = ?2, name = ?3, description = ?4, is_initial = ?5, is_terminal = ?6
+                 WHERE state_id = ?1",
+                params![
+                    state_id,
+                    state.workflow_id,
+                    state.name,
+                    state.description,
+                    state.is_initial,
+                    state.is_terminal,
+                ],
+            )?;
+            Ok(())
+        }).map_err(DatabaseError::from)
     }
 
     /// Delete a workflow state
@@ -544,11 +562,13 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflow state could not be deleted
     pub fn delete_workflow_state(&self, state_id: i64) -> DatabaseResult<()> {
-        self.connection.execute(
-            "DELETE FROM WorkflowStates WHERE state_id = ?1",
-            params![state_id],
-        )?;
-        Ok(())
+        self.connection_manager.execute_mut(|conn| {
+            conn.execute(
+                "DELETE FROM WorkflowStates WHERE state_id = ?1",
+                params![state_id],
+            )?;
+            Ok(())
+        }).map_err(DatabaseError::from)
     }
 
     /// Create a new workflow transition in the database
@@ -565,19 +585,21 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflow transition could not be created
     pub fn create_workflow_transition(&self, transition: &WorkflowTransition) -> DatabaseResult<i64> {
-        self.connection.execute(
-            "INSERT INTO WorkflowTransitions (workflow_id, from_state_id, to_state_id, name, description, requires_approval)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            params![
-                transition.workflow_id,
-                transition.from_state_id,
-                transition.to_state_id,
-                transition.name,
-                transition.description,
-                transition.requires_approval,
-            ],
-        )?;
-        Ok(self.connection.last_insert_rowid())
+        self.connection_manager.execute_mut(|conn| {
+            conn.execute(
+                "INSERT INTO WorkflowTransitions (workflow_id, from_state_id, to_state_id, name, description, requires_approval)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![
+                    transition.workflow_id,
+                    transition.from_state_id,
+                    transition.to_state_id,
+                    transition.name,
+                    transition.description,
+                    transition.requires_approval,
+                ],
+            )?;
+            Ok(conn.last_insert_rowid())
+        }).map_err(DatabaseError::from)
     }
 
     /// Get a workflow transition by its ID
@@ -594,14 +616,16 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflow transition could not be found
     pub fn get_workflow_transition(&self, transition_id: i64) -> DatabaseResult<WorkflowTransition> {
-        let transition = self.connection.query_row(
-            "SELECT transition_id, workflow_id, from_state_id, to_state_id, name, description, requires_approval
-             FROM WorkflowTransitions
-             WHERE transition_id = ?1",
-            params![transition_id],
-            |row| self.row_to_workflow_transition(row),
-        )?;
-        Ok(transition)
+        self.connection_manager.execute(|conn| {
+            let transition = conn.query_row(
+                "SELECT transition_id, workflow_id, from_state_id, to_state_id, name, description, requires_approval
+                 FROM WorkflowTransitions
+                 WHERE transition_id = ?1",
+                params![transition_id],
+                |row| self.row_to_workflow_transition(row),
+            )?;
+            Ok(transition)
+        }).map_err(DatabaseError::from)
     }
 
     /// Get all workflow transitions for a workflow
@@ -618,18 +642,20 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflow transitions could not be retrieved
     pub fn get_workflow_transitions(&self, workflow_id: i64) -> DatabaseResult<Vec<WorkflowTransition>> {
-        let mut stmt = self.connection.prepare(
-            "SELECT transition_id, workflow_id, from_state_id, to_state_id, name, description, requires_approval
-             FROM WorkflowTransitions
-             WHERE workflow_id = ?1
-             ORDER BY name",
-        )?;
-        let transitions_iter = stmt.query_map(params![workflow_id], |row| self.row_to_workflow_transition(row))?;
-        let mut transitions = Vec::new();
-        for transition_result in transitions_iter {
-            transitions.push(transition_result?);
-        }
-        Ok(transitions)
+        self.connection_manager.execute(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT transition_id, workflow_id, from_state_id, to_state_id, name, description, requires_approval
+                 FROM WorkflowTransitions
+                 WHERE workflow_id = ?1
+                 ORDER BY name",
+            )?;
+            let transitions_iter = stmt.query_map(params![workflow_id], |row| self.row_to_workflow_transition(row))?;
+            let mut transitions = Vec::new();
+            for transition_result in transitions_iter {
+                transitions.push(transition_result?);
+            }
+            Ok(transitions)
+        }).map_err(DatabaseError::from)
     }
 
     /// Get all workflow transitions from a specific state
@@ -646,18 +672,20 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflow transitions could not be retrieved
     pub fn get_transitions_from_state(&self, from_state_id: i64) -> DatabaseResult<Vec<WorkflowTransition>> {
-        let mut stmt = self.connection.prepare(
-            "SELECT transition_id, workflow_id, from_state_id, to_state_id, name, description, requires_approval
-             FROM WorkflowTransitions
-             WHERE from_state_id = ?1
-             ORDER BY name",
-        )?;
-        let transitions_iter = stmt.query_map(params![from_state_id], |row| self.row_to_workflow_transition(row))?;
-        let mut transitions = Vec::new();
-        for transition_result in transitions_iter {
-            transitions.push(transition_result?);
-        }
-        Ok(transitions)
+        self.connection_manager.execute(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT transition_id, workflow_id, from_state_id, to_state_id, name, description, requires_approval
+                 FROM WorkflowTransitions
+                 WHERE from_state_id = ?1
+                 ORDER BY name",
+            )?;
+            let transitions_iter = stmt.query_map(params![from_state_id], |row| self.row_to_workflow_transition(row))?;
+            let mut transitions = Vec::new();
+            for transition_result in transitions_iter {
+                transitions.push(transition_result?);
+            }
+            Ok(transitions)
+        }).map_err(DatabaseError::from)
     }
 
     /// Update a workflow transition
@@ -678,21 +706,23 @@ impl<'a> WorkflowManager<'a> {
             DatabaseError::InitializationError("Workflow Transition ID is required for update".to_string())
         })?;
 
-        self.connection.execute(
-            "UPDATE WorkflowTransitions
-             SET workflow_id = ?2, from_state_id = ?3, to_state_id = ?4, name = ?5, description = ?6, requires_approval = ?7
-             WHERE transition_id = ?1",
-            params![
-                transition_id,
-                transition.workflow_id,
-                transition.from_state_id,
-                transition.to_state_id,
-                transition.name,
-                transition.description,
-                transition.requires_approval,
-            ],
-        )?;
-        Ok(())
+        self.connection_manager.execute_mut(|conn| {
+            conn.execute(
+                "UPDATE WorkflowTransitions
+                 SET workflow_id = ?2, from_state_id = ?3, to_state_id = ?4, name = ?5, description = ?6, requires_approval = ?7
+                 WHERE transition_id = ?1",
+                params![
+                    transition_id,
+                    transition.workflow_id,
+                    transition.from_state_id,
+                    transition.to_state_id,
+                    transition.name,
+                    transition.description,
+                    transition.requires_approval,
+                ],
+            )?;
+            Ok(())
+        }).map_err(DatabaseError::from)
     }
 
     /// Delete a workflow transition
@@ -709,11 +739,13 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflow transition could not be deleted
     pub fn delete_workflow_transition(&self, transition_id: i64) -> DatabaseResult<()> {
-        self.connection.execute(
-            "DELETE FROM WorkflowTransitions WHERE transition_id = ?1",
-            params![transition_id],
-        )?;
-        Ok(())
+        self.connection_manager.execute_mut(|conn| {
+            conn.execute(
+                "DELETE FROM WorkflowTransitions WHERE transition_id = ?1",
+                params![transition_id],
+            )?;
+            Ok(())
+        }).map_err(DatabaseError::from)
     }
 
     /// Create a default part workflow
@@ -726,103 +758,213 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflow could not be created
     pub fn create_default_part_workflow(&self) -> DatabaseResult<i64> {
-        // Create the workflow
-        let workflow = Workflow::new(
-            "Part Workflow".to_string(),
-            Some("Default workflow for parts".to_string()),
-            true,
-        );
-        let workflow_id = self.create_workflow(&workflow)?;
+        self.connection_manager.transaction(|tx| {
+            // Create the workflow
+            let workflow = Workflow::new(
+                "Part Workflow".to_string(),
+                Some("Default workflow for parts".to_string()),
+                true,
+            );
+            let workflow_id = self.create_workflow_in_transaction(&workflow, tx)?;
 
-        // Create the states
-        let draft_state = WorkflowState::new(
-            workflow_id,
-            "Draft".to_string(),
-            Some("Initial state for new parts".to_string()),
-            true,
-            false,
-        );
-        let draft_state_id = self.create_workflow_state(&draft_state)?;
+            // Create the states
+            let draft_state = WorkflowState::new(
+                workflow_id,
+                "Draft".to_string(),
+                Some("Initial state for new parts".to_string()),
+                true,
+                false,
+            );
+            
+            tx.execute(
+                "INSERT INTO WorkflowStates (workflow_id, name, description, is_initial, is_terminal)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![
+                    draft_state.workflow_id,
+                    draft_state.name,
+                    draft_state.description,
+                    draft_state.is_initial,
+                    draft_state.is_terminal,
+                ],
+            )?;
+            let draft_state_id = tx.last_insert_rowid();
 
-        let in_review_state = WorkflowState::new(
-            workflow_id,
-            "In Review".to_string(),
-            Some("Part is being reviewed".to_string()),
-            false,
-            false,
-        );
-        let in_review_state_id = self.create_workflow_state(&in_review_state)?;
+            let in_review_state = WorkflowState::new(
+                workflow_id,
+                "In Review".to_string(),
+                Some("Part is being reviewed".to_string()),
+                false,
+                false,
+            );
+            
+            tx.execute(
+                "INSERT INTO WorkflowStates (workflow_id, name, description, is_initial, is_terminal)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![
+                    in_review_state.workflow_id,
+                    in_review_state.name,
+                    in_review_state.description,
+                    in_review_state.is_initial,
+                    in_review_state.is_terminal,
+                ],
+            )?;
+            let in_review_state_id = tx.last_insert_rowid();
 
-        let released_state = WorkflowState::new(
-            workflow_id,
-            "Released".to_string(),
-            Some("Part has been approved and released".to_string()),
-            false,
-            false,
-        );
-        let released_state_id = self.create_workflow_state(&released_state)?;
+            let released_state = WorkflowState::new(
+                workflow_id,
+                "Released".to_string(),
+                Some("Part has been approved and released".to_string()),
+                false,
+                false,
+            );
+            
+            tx.execute(
+                "INSERT INTO WorkflowStates (workflow_id, name, description, is_initial, is_terminal)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![
+                    released_state.workflow_id,
+                    released_state.name,
+                    released_state.description,
+                    released_state.is_initial,
+                    released_state.is_terminal,
+                ],
+            )?;
+            let released_state_id = tx.last_insert_rowid();
 
-        let obsolete_state = WorkflowState::new(
-            workflow_id,
-            "Obsolete".to_string(),
-            Some("Part is no longer active".to_string()),
-            false,
-            true,
-        );
-        let obsolete_state_id = self.create_workflow_state(&obsolete_state)?;
+            let obsolete_state = WorkflowState::new(
+                workflow_id,
+                "Obsolete".to_string(),
+                Some("Part is no longer active".to_string()),
+                false,
+                true,
+            );
+            
+            tx.execute(
+                "INSERT INTO WorkflowStates (workflow_id, name, description, is_initial, is_terminal)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![
+                    obsolete_state.workflow_id,
+                    obsolete_state.name,
+                    obsolete_state.description,
+                    obsolete_state.is_initial,
+                    obsolete_state.is_terminal,
+                ],
+            )?;
+            let obsolete_state_id = tx.last_insert_rowid();
 
-        // Create the transitions
-        let submit_for_review = WorkflowTransition::new(
-            workflow_id,
-            draft_state_id,
-            in_review_state_id,
-            "Submit for Review".to_string(),
-            Some("Submit the part for review".to_string()),
-            false,
-        );
-        self.create_workflow_transition(&submit_for_review)?;
+            // Create the transitions
+            let submit_for_review = WorkflowTransition::new(
+                workflow_id,
+                draft_state_id,
+                in_review_state_id,
+                "Submit for Review".to_string(),
+                Some("Submit the part for review".to_string()),
+                false,
+            );
+            
+            tx.execute(
+                "INSERT INTO WorkflowTransitions (workflow_id, from_state_id, to_state_id, name, description, requires_approval)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![
+                    submit_for_review.workflow_id,
+                    submit_for_review.from_state_id,
+                    submit_for_review.to_state_id,
+                    submit_for_review.name,
+                    submit_for_review.description,
+                    submit_for_review.requires_approval,
+                ],
+            )?;
 
-        let approve = WorkflowTransition::new(
-            workflow_id,
-            in_review_state_id,
-            released_state_id,
-            "Approve".to_string(),
-            Some("Approve the part for release".to_string()),
-            true,
-        );
-        self.create_workflow_transition(&approve)?;
+            let approve = WorkflowTransition::new(
+                workflow_id,
+                in_review_state_id,
+                released_state_id,
+                "Approve".to_string(),
+                Some("Approve the part for release".to_string()),
+                true,
+            );
+            
+            tx.execute(
+                "INSERT INTO WorkflowTransitions (workflow_id, from_state_id, to_state_id, name, description, requires_approval)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![
+                    approve.workflow_id,
+                    approve.from_state_id,
+                    approve.to_state_id,
+                    approve.name,
+                    approve.description,
+                    approve.requires_approval,
+                ],
+            )?;
 
-        let reject = WorkflowTransition::new(
-            workflow_id,
-            in_review_state_id,
-            draft_state_id,
-            "Reject".to_string(),
-            Some("Reject the part and return to draft".to_string()),
-            true,
-        );
-        self.create_workflow_transition(&reject)?;
+            let reject = WorkflowTransition::new(
+                workflow_id,
+                in_review_state_id,
+                draft_state_id,
+                "Reject".to_string(),
+                Some("Reject the part and return to draft".to_string()),
+                true,
+            );
+            
+            tx.execute(
+                "INSERT INTO WorkflowTransitions (workflow_id, from_state_id, to_state_id, name, description, requires_approval)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![
+                    reject.workflow_id,
+                    reject.from_state_id,
+                    reject.to_state_id,
+                    reject.name,
+                    reject.description,
+                    reject.requires_approval,
+                ],
+            )?;
 
-        let obsolete = WorkflowTransition::new(
-            workflow_id,
-            released_state_id,
-            obsolete_state_id,
-            "Obsolete".to_string(),
-            Some("Mark the part as obsolete".to_string()),
-            true,
-        );
-        self.create_workflow_transition(&obsolete)?;
+            let obsolete = WorkflowTransition::new(
+                workflow_id,
+                released_state_id,
+                obsolete_state_id,
+                "Obsolete".to_string(),
+                Some("Mark the part as obsolete".to_string()),
+                true,
+            );
+            
+            tx.execute(
+                "INSERT INTO WorkflowTransitions (workflow_id, from_state_id, to_state_id, name, description, requires_approval)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![
+                    obsolete.workflow_id,
+                    obsolete.from_state_id,
+                    obsolete.to_state_id,
+                    obsolete.name,
+                    obsolete.description,
+                    obsolete.requires_approval,
+                ],
+            )?;
 
-        let revise = WorkflowTransition::new(
-            workflow_id,
-            released_state_id,
-            draft_state_id,
-            "Revise".to_string(),
-            Some("Create a new revision of the part".to_string()),
-            false,
-        );
-        self.create_workflow_transition(&revise)?;
+            let revise = WorkflowTransition::new(
+                workflow_id,
+                released_state_id,
+                draft_state_id,
+                "Revise".to_string(),
+                Some("Create a new revision of the part".to_string()),
+                false,
+            );
+            
+            tx.execute(
+                "INSERT INTO WorkflowTransitions (workflow_id, from_state_id, to_state_id, name, description, requires_approval)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![
+                    revise.workflow_id,
+                    revise.from_state_id,
+                    revise.to_state_id,
+                    revise.name,
+                    revise.description,
+                    revise.requires_approval,
+                ],
+            )?;
 
-        Ok(workflow_id)
+            Ok(workflow_id)
+        }).map_err(DatabaseError::from)
     }
 
     /// Convert a database row to a Workflow
@@ -910,11 +1052,11 @@ mod tests {
         let db_path = temp_dir.path().join("test.db");
 
         // Create a new database manager and initialize the schema
-        let mut db_manager = DatabaseManager::new(&db_path).unwrap();
+        let db_manager = DatabaseManager::new(&db_path).unwrap();
         db_manager.initialize_schema().unwrap();
 
         // Create a workflow manager
-        let workflow_manager = WorkflowManager::new(db_manager.connection());
+        let workflow_manager = WorkflowManager::new(db_manager.connection_manager());
 
         // Create a new workflow
         let workflow = Workflow::new(
@@ -942,11 +1084,11 @@ mod tests {
         let db_path = temp_dir.path().join("test.db");
 
         // Create a new database manager and initialize the schema
-        let mut db_manager = DatabaseManager::new(&db_path).unwrap();
+        let db_manager = DatabaseManager::new(&db_path).unwrap();
         db_manager.initialize_schema().unwrap();
 
         // Create a workflow manager
-        let workflow_manager = WorkflowManager::new(db_manager.connection());
+        let workflow_manager = WorkflowManager::new(db_manager.connection_manager());
 
         // Create a new workflow
         let workflow = Workflow::new(
@@ -988,11 +1130,11 @@ mod tests {
         let db_path = temp_dir.path().join("test.db");
 
         // Create a new database manager and initialize the schema
-        let mut db_manager = DatabaseManager::new(&db_path).unwrap();
+        let db_manager = DatabaseManager::new(&db_path).unwrap();
         db_manager.initialize_schema().unwrap();
 
         // Create a workflow manager
-        let workflow_manager = WorkflowManager::new(db_manager.connection());
+        let workflow_manager = WorkflowManager::new(db_manager.connection_manager());
 
         // Create a new workflow
         let workflow = Workflow::new(
@@ -1055,11 +1197,11 @@ mod tests {
         let db_path = temp_dir.path().join("test.db");
 
         // Create a new database manager and initialize the schema
-        let mut db_manager = DatabaseManager::new(&db_path).unwrap();
+        let db_manager = DatabaseManager::new(&db_path).unwrap();
         db_manager.initialize_schema().unwrap();
 
         // Create a workflow manager
-        let workflow_manager = WorkflowManager::new(db_manager.connection());
+        let workflow_manager = WorkflowManager::new(db_manager.connection_manager());
 
         // Create the default part workflow
         let workflow_id = workflow_manager.create_default_part_workflow().unwrap();

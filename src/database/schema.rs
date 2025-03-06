@@ -382,17 +382,11 @@ impl DatabaseManager {
         tx.execute("CREATE INDEX IF NOT EXISTS idx_workflow_transitions_from_state_id ON WorkflowTransitions(from_state_id)", [])?;
         tx.execute("CREATE INDEX IF NOT EXISTS idx_workflow_transitions_to_state_id ON WorkflowTransitions(to_state_id)", [])?;
 
-        // Insert initial schema version
+        // Insert initial schema version (use OR IGNORE to handle multiple initializations)
         tx.execute(
-            "INSERT INTO SchemaVersion (version, description) VALUES (1, 'Initial schema creation')",
+            "INSERT OR IGNORE INTO SchemaVersion (version, description) VALUES (1, 'Initial schema creation')",
             [],
         )?;
-
-            // Insert initial schema version
-            tx.execute(
-                "INSERT INTO SchemaVersion (version, description) VALUES (1, 'Initial schema creation')",
-                [],
-            )?;
             
             Ok(())
         })

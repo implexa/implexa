@@ -199,7 +199,7 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflow could not be created
     pub fn create_workflow(&self, workflow: &Workflow) -> DatabaseResult<i64> {
-        self.connection_manager.execute_mut(|conn| {
+        self.connection_manager.execute_mut::<_, _, DatabaseError>(|conn| {
             conn.execute(
                 "INSERT INTO Workflows (name, description, active)
                  VALUES (?1, ?2, ?3)",
@@ -209,7 +209,7 @@ impl<'a> WorkflowManager<'a> {
                     workflow.active,
                 ],
             )?;
-            Ok(conn.last_insert_rowid())
+            Ok::<i64, DatabaseError>(conn.last_insert_rowid())
         }).map_err(DatabaseError::from)
     }
     
@@ -500,7 +500,7 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the initial state could not be found
     pub fn get_initial_state(&self, workflow_id: i64) -> DatabaseResult<WorkflowState> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let state = conn.query_row(
                 "SELECT state_id, workflow_id, name, description, is_initial, is_terminal
                  FROM WorkflowStates
@@ -508,7 +508,7 @@ impl<'a> WorkflowManager<'a> {
                 params![workflow_id],
                 |row| self.row_to_workflow_state(row),
             )?;
-            Ok(state)
+            Ok::<WorkflowState, DatabaseError>(state)
         }).map_err(DatabaseError::from)
     }
 
@@ -530,7 +530,7 @@ impl<'a> WorkflowManager<'a> {
             DatabaseError::InitializationError("Workflow State ID is required for update".to_string())
         })?;
 
-        self.connection_manager.execute_mut(|conn| {
+        self.connection_manager.execute_mut::<_, _, DatabaseError>(|conn| {
             conn.execute(
                 "UPDATE WorkflowStates
                  SET workflow_id = ?2, name = ?3, description = ?4, is_initial = ?5, is_terminal = ?6
@@ -544,7 +544,7 @@ impl<'a> WorkflowManager<'a> {
                     state.is_terminal,
                 ],
             )?;
-            Ok(())
+            Ok::<(), DatabaseError>(())
         }).map_err(DatabaseError::from)
     }
 
@@ -562,12 +562,12 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflow state could not be deleted
     pub fn delete_workflow_state(&self, state_id: i64) -> DatabaseResult<()> {
-        self.connection_manager.execute_mut(|conn| {
+        self.connection_manager.execute_mut::<_, _, DatabaseError>(|conn| {
             conn.execute(
                 "DELETE FROM WorkflowStates WHERE state_id = ?1",
                 params![state_id],
             )?;
-            Ok(())
+            Ok::<(), DatabaseError>(())
         }).map_err(DatabaseError::from)
     }
 
@@ -585,7 +585,7 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflow transition could not be created
     pub fn create_workflow_transition(&self, transition: &WorkflowTransition) -> DatabaseResult<i64> {
-        self.connection_manager.execute_mut(|conn| {
+        self.connection_manager.execute_mut::<_, _, DatabaseError>(|conn| {
             conn.execute(
                 "INSERT INTO WorkflowTransitions (workflow_id, from_state_id, to_state_id, name, description, requires_approval)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
@@ -598,7 +598,7 @@ impl<'a> WorkflowManager<'a> {
                     transition.requires_approval,
                 ],
             )?;
-            Ok(conn.last_insert_rowid())
+            Ok::<i64, DatabaseError>(conn.last_insert_rowid())
         }).map_err(DatabaseError::from)
     }
 
@@ -616,7 +616,7 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflow transition could not be found
     pub fn get_workflow_transition(&self, transition_id: i64) -> DatabaseResult<WorkflowTransition> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let transition = conn.query_row(
                 "SELECT transition_id, workflow_id, from_state_id, to_state_id, name, description, requires_approval
                  FROM WorkflowTransitions
@@ -624,7 +624,7 @@ impl<'a> WorkflowManager<'a> {
                 params![transition_id],
                 |row| self.row_to_workflow_transition(row),
             )?;
-            Ok(transition)
+            Ok::<WorkflowTransition, DatabaseError>(transition)
         }).map_err(DatabaseError::from)
     }
 
@@ -642,7 +642,7 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflow transitions could not be retrieved
     pub fn get_workflow_transitions(&self, workflow_id: i64) -> DatabaseResult<Vec<WorkflowTransition>> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let mut stmt = conn.prepare(
                 "SELECT transition_id, workflow_id, from_state_id, to_state_id, name, description, requires_approval
                  FROM WorkflowTransitions
@@ -654,7 +654,7 @@ impl<'a> WorkflowManager<'a> {
             for transition_result in transitions_iter {
                 transitions.push(transition_result?);
             }
-            Ok(transitions)
+            Ok::<Vec<WorkflowTransition>, DatabaseError>(transitions)
         }).map_err(DatabaseError::from)
     }
 
@@ -672,7 +672,7 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflow transitions could not be retrieved
     pub fn get_transitions_from_state(&self, from_state_id: i64) -> DatabaseResult<Vec<WorkflowTransition>> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let mut stmt = conn.prepare(
                 "SELECT transition_id, workflow_id, from_state_id, to_state_id, name, description, requires_approval
                  FROM WorkflowTransitions
@@ -684,7 +684,7 @@ impl<'a> WorkflowManager<'a> {
             for transition_result in transitions_iter {
                 transitions.push(transition_result?);
             }
-            Ok::<Vec<WorkflowTransition>, rusqlite::Error>(transitions)
+            Ok::<Vec<WorkflowTransition>, DatabaseError>(transitions)
         }).map_err(DatabaseError::from)
     }
 
@@ -706,7 +706,7 @@ impl<'a> WorkflowManager<'a> {
             DatabaseError::InitializationError("Workflow Transition ID is required for update".to_string())
         })?;
 
-        self.connection_manager.execute_mut(|conn| {
+        self.connection_manager.execute_mut::<_, _, DatabaseError>(|conn| {
             conn.execute(
                 "UPDATE WorkflowTransitions
                  SET workflow_id = ?2, from_state_id = ?3, to_state_id = ?4, name = ?5, description = ?6, requires_approval = ?7
@@ -721,7 +721,7 @@ impl<'a> WorkflowManager<'a> {
                     transition.requires_approval,
                 ],
             )?;
-            Ok::<(), rusqlite::Error>(())
+            Ok::<(), DatabaseError>(())
         }).map_err(DatabaseError::from)
     }
 
@@ -739,12 +739,12 @@ impl<'a> WorkflowManager<'a> {
     ///
     /// Returns a DatabaseError if the workflow transition could not be deleted
     pub fn delete_workflow_transition(&self, transition_id: i64) -> DatabaseResult<()> {
-        self.connection_manager.execute_mut(|conn| {
+        self.connection_manager.execute_mut::<_, _, DatabaseError>(|conn| {
             conn.execute(
                 "DELETE FROM WorkflowTransitions WHERE transition_id = ?1",
                 params![transition_id],
             )?;
-            Ok::<(), rusqlite::Error>(())
+            Ok::<(), DatabaseError>(())
         }).map_err(DatabaseError::from)
     }
 
@@ -963,7 +963,7 @@ impl<'a> WorkflowManager<'a> {
                 ],
             )?;
 
-            Ok::<i64, rusqlite::Error>(workflow_id)
+            Ok::<i64, DatabaseError>(workflow_id)
         }).map_err(DatabaseError::from)
     }
 

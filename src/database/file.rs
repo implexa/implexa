@@ -196,7 +196,7 @@ impl<'a> FileManager<'a> {
     ///
     /// Returns a DatabaseError if the file could not be created
     pub fn create_file(&self, file: &File) -> DatabaseResult<i64> {
-        self.connection_manager.execute_mut(|conn| {
+        self.connection_manager.execute_mut::<_, _, DatabaseError>(|conn| {
             conn.execute(
                 "INSERT INTO Files (part_id, revision_id, path, type, description)
                  VALUES (?1, ?2, ?3, ?4, ?5)",
@@ -208,7 +208,7 @@ impl<'a> FileManager<'a> {
                     file.description,
                 ],
             )?;
-            Ok(conn.last_insert_rowid())
+            Ok::<i64, DatabaseError>(conn.last_insert_rowid())
         }).map_err(DatabaseError::from)
     }
     
@@ -255,7 +255,7 @@ impl<'a> FileManager<'a> {
     ///
     /// Returns a DatabaseError if the file could not be found
     pub fn get_file(&self, file_id: i64) -> DatabaseResult<File> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let file = conn.query_row(
                 "SELECT file_id, part_id, revision_id, path, type, description
                  FROM Files
@@ -263,7 +263,7 @@ impl<'a> FileManager<'a> {
                 params![file_id],
                 |row| self.row_to_file(row),
             )?;
-            Ok(file)
+            Ok::<File, DatabaseError>(file)
         }).map_err(DatabaseError::from)
     }
 
@@ -281,7 +281,7 @@ impl<'a> FileManager<'a> {
     ///
     /// Returns a DatabaseError if the files could not be retrieved
     pub fn get_part_files(&self, part_id: &str) -> DatabaseResult<Vec<File>> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let mut stmt = conn.prepare(
                 "SELECT file_id, part_id, revision_id, path, type, description
                  FROM Files
@@ -293,7 +293,7 @@ impl<'a> FileManager<'a> {
             for file_result in files_iter {
                 files.push(file_result?);
             }
-            Ok(files)
+            Ok::<Vec<File>, DatabaseError>(files)
         }).map_err(DatabaseError::from)
     }
 
@@ -311,7 +311,7 @@ impl<'a> FileManager<'a> {
     ///
     /// Returns a DatabaseError if the files could not be retrieved
     pub fn get_revision_files(&self, revision_id: i64) -> DatabaseResult<Vec<File>> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let mut stmt = conn.prepare(
                 "SELECT file_id, part_id, revision_id, path, type, description
                  FROM Files
@@ -323,7 +323,7 @@ impl<'a> FileManager<'a> {
             for file_result in files_iter {
                 files.push(file_result?);
             }
-            Ok(files)
+            Ok::<Vec<File>, DatabaseError>(files)
         }).map_err(DatabaseError::from)
     }
 
@@ -342,7 +342,7 @@ impl<'a> FileManager<'a> {
     ///
     /// Returns a DatabaseError if the files could not be retrieved
     pub fn get_part_files_by_type(&self, part_id: &str, file_type: &FileType) -> DatabaseResult<Vec<File>> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let mut stmt = conn.prepare(
                 "SELECT file_id, part_id, revision_id, path, type, description
                  FROM Files
@@ -354,7 +354,7 @@ impl<'a> FileManager<'a> {
             for file_result in files_iter {
                 files.push(file_result?);
             }
-            Ok(files)
+            Ok::<Vec<File>, DatabaseError>(files)
         }).map_err(DatabaseError::from)
     }
 
@@ -373,7 +373,7 @@ impl<'a> FileManager<'a> {
     ///
     /// Returns a DatabaseError if the files could not be retrieved
     pub fn get_revision_files_by_type(&self, revision_id: i64, file_type: &FileType) -> DatabaseResult<Vec<File>> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let mut stmt = conn.prepare(
                 "SELECT file_id, part_id, revision_id, path, type, description
                  FROM Files
@@ -385,7 +385,7 @@ impl<'a> FileManager<'a> {
             for file_result in files_iter {
                 files.push(file_result?);
             }
-            Ok(files)
+            Ok::<Vec<File>, DatabaseError>(files)
         }).map_err(DatabaseError::from)
     }
 
@@ -407,7 +407,7 @@ impl<'a> FileManager<'a> {
             DatabaseError::InitializationError("File ID is required for update".to_string())
         })?;
 
-        self.connection_manager.execute_mut(|conn| {
+        self.connection_manager.execute_mut::<_, _, DatabaseError>(|conn| {
             conn.execute(
                 "UPDATE Files
                  SET part_id = ?2, revision_id = ?3, path = ?4, type = ?5, description = ?6
@@ -421,7 +421,7 @@ impl<'a> FileManager<'a> {
                     file.description,
                 ],
             )?;
-            Ok(())
+            Ok::<(), DatabaseError>(())
         }).map_err(DatabaseError::from)
     }
     
@@ -474,12 +474,12 @@ impl<'a> FileManager<'a> {
     ///
     /// Returns a DatabaseError if the file could not be deleted
     pub fn delete_file(&self, file_id: i64) -> DatabaseResult<()> {
-        self.connection_manager.execute_mut(|conn| {
+        self.connection_manager.execute_mut::<_, _, DatabaseError>(|conn| {
             conn.execute(
                 "DELETE FROM Files WHERE file_id = ?1",
                 params![file_id],
             )?;
-            Ok(())
+            Ok::<(), DatabaseError>(())
         }).map_err(DatabaseError::from)
     }
     

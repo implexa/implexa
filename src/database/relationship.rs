@@ -152,7 +152,7 @@ impl<'a> RelationshipManager<'a> {
     ///
     /// Returns a DatabaseError if the relationship could not be created
     pub fn create_relationship(&self, relationship: &Relationship) -> DatabaseResult<i64> {
-        self.connection_manager.execute_mut(|conn| {
+        self.connection_manager.execute_mut::<_, _, DatabaseError>(|conn| {
             conn.execute(
                 "INSERT INTO Relationships (parent_part_id, child_part_id, type, quantity)
                  VALUES (?1, ?2, ?3, ?4)",
@@ -163,7 +163,7 @@ impl<'a> RelationshipManager<'a> {
                     relationship.quantity,
                 ],
             )?;
-            Ok(conn.last_insert_rowid())
+            Ok::<i64, DatabaseError>(conn.last_insert_rowid())
         }).map_err(DatabaseError::from)
     }
     
@@ -209,7 +209,7 @@ impl<'a> RelationshipManager<'a> {
     ///
     /// Returns a DatabaseError if the relationship could not be found
     pub fn get_relationship(&self, relationship_id: i64) -> DatabaseResult<Relationship> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let relationship = conn.query_row(
                 "SELECT relationship_id, parent_part_id, child_part_id, type, quantity
                  FROM Relationships
@@ -217,7 +217,7 @@ impl<'a> RelationshipManager<'a> {
                 params![relationship_id],
                 |row| self.row_to_relationship(row),
             )?;
-            Ok(relationship)
+            Ok::<Relationship, DatabaseError>(relationship)
         }).map_err(DatabaseError::from)
     }
 
@@ -235,7 +235,7 @@ impl<'a> RelationshipManager<'a> {
     ///
     /// Returns a DatabaseError if the relationships could not be retrieved
     pub fn get_child_relationships(&self, part_id: &str) -> DatabaseResult<Vec<Relationship>> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let mut stmt = conn.prepare(
                 "SELECT relationship_id, parent_part_id, child_part_id, type, quantity
                  FROM Relationships
@@ -246,7 +246,7 @@ impl<'a> RelationshipManager<'a> {
             for relationship_result in relationships_iter {
                 relationships.push(relationship_result?);
             }
-            Ok(relationships)
+            Ok::<Vec<Relationship>, DatabaseError>(relationships)
         }).map_err(DatabaseError::from)
     }
 
@@ -264,7 +264,7 @@ impl<'a> RelationshipManager<'a> {
     ///
     /// Returns a DatabaseError if the relationships could not be retrieved
     pub fn get_parent_relationships(&self, part_id: &str) -> DatabaseResult<Vec<Relationship>> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let mut stmt = conn.prepare(
                 "SELECT relationship_id, parent_part_id, child_part_id, type, quantity
                  FROM Relationships
@@ -275,7 +275,7 @@ impl<'a> RelationshipManager<'a> {
             for relationship_result in relationships_iter {
                 relationships.push(relationship_result?);
             }
-            Ok(relationships)
+            Ok::<Vec<Relationship>, DatabaseError>(relationships)
         }).map_err(DatabaseError::from)
     }
 
@@ -297,7 +297,7 @@ impl<'a> RelationshipManager<'a> {
             DatabaseError::InitializationError("Relationship ID is required for update".to_string())
         })?;
 
-        self.connection_manager.execute_mut(|conn| {
+        self.connection_manager.execute_mut::<_, _, DatabaseError>(|conn| {
             conn.execute(
                 "UPDATE Relationships
                  SET parent_part_id = ?2, child_part_id = ?3, type = ?4, quantity = ?5
@@ -310,7 +310,7 @@ impl<'a> RelationshipManager<'a> {
                     relationship.quantity,
                 ],
             )?;
-            Ok(())
+            Ok::<(), DatabaseError>(())
         }).map_err(DatabaseError::from)
     }
 
@@ -328,12 +328,12 @@ impl<'a> RelationshipManager<'a> {
     ///
     /// Returns a DatabaseError if the relationship could not be deleted
     pub fn delete_relationship(&self, relationship_id: i64) -> DatabaseResult<()> {
-        self.connection_manager.execute_mut(|conn| {
+        self.connection_manager.execute_mut::<_, _, DatabaseError>(|conn| {
             conn.execute(
                 "DELETE FROM Relationships WHERE relationship_id = ?1",
                 params![relationship_id],
             )?;
-            Ok(())
+            Ok::<(), DatabaseError>(())
         }).map_err(DatabaseError::from)
     }
 
@@ -351,7 +351,7 @@ impl<'a> RelationshipManager<'a> {
     ///
     /// Returns a DatabaseError if the BOM could not be retrieved
     pub fn get_bom(&self, part_id: &str) -> DatabaseResult<Vec<(String, String, String, String, i64)>> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let mut stmt = conn.prepare(
                 "SELECT p.part_id, p.name, p.category, p.subcategory, r.quantity
                  FROM Parts p
@@ -371,7 +371,7 @@ impl<'a> RelationshipManager<'a> {
             for bom_result in bom_iter {
                 bom.push(bom_result?);
             }
-            Ok(bom)
+            Ok::<Vec<(String, String, String, String, i64)>, DatabaseError>(bom)
         }).map_err(DatabaseError::from)
     }
 

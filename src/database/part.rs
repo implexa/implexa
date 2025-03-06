@@ -175,7 +175,7 @@ impl<'a> PartManager<'a> {
                 [],
             )?;
             
-            Ok(next_id)
+            Ok::<i64, rusqlite::Error>(next_id)
         }).map_err(DatabaseError::from)
     }
     
@@ -264,7 +264,7 @@ impl<'a> PartManager<'a> {
     ///
     /// Returns a DatabaseError if the part could not be created
     pub fn create_part(&self, part: &Part) -> DatabaseResult<()> {
-        self.connection_manager.execute_mut(|conn| {
+        self.connection_manager.execute_mut::<_, _, DatabaseError>(|conn| {
             // Convert SystemTime to seconds since UNIX_EPOCH for SQLite
             let created_secs = part.created_date
                 .duration_since(UNIX_EPOCH)
@@ -289,7 +289,7 @@ impl<'a> PartManager<'a> {
                     modified_secs,
                 ],
             )?;
-            Ok(())
+            Ok::<(), DatabaseError>(())
         }).map_err(DatabaseError::from)
     }
     
@@ -349,7 +349,7 @@ impl<'a> PartManager<'a> {
     ///
     /// Returns a DatabaseError if the part could not be found
     pub fn get_part(&self, part_id: i64) -> DatabaseResult<Part> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let part = conn.query_row(
                 "SELECT part_id, category, subcategory, name, description, created_date, modified_date
                  FROM Parts
@@ -357,7 +357,7 @@ impl<'a> PartManager<'a> {
                 params![part_id],
                 |row| self.row_to_part(row),
             )?;
-            Ok(part)
+            Ok::<Part, DatabaseError>(part)
         }).map_err(DatabaseError::from)
     }
 
@@ -396,7 +396,7 @@ impl<'a> PartManager<'a> {
     ///
     /// Returns a DatabaseError if the parts could not be retrieved
     pub fn get_all_parts(&self) -> DatabaseResult<Vec<Part>> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let mut stmt = conn.prepare(
                 "SELECT part_id, category, subcategory, name, description, created_date, modified_date
                  FROM Parts
@@ -407,7 +407,7 @@ impl<'a> PartManager<'a> {
             for part_result in parts_iter {
                 parts.push(part_result?);
             }
-            Ok(parts)
+            Ok::<Vec<Part>, DatabaseError>(parts)
         }).map_err(DatabaseError::from)
     }
 
@@ -425,7 +425,7 @@ impl<'a> PartManager<'a> {
     ///
     /// Returns a DatabaseError if the parts could not be retrieved
     pub fn get_parts_by_category(&self, category: &str) -> DatabaseResult<Vec<Part>> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let mut stmt = conn.prepare(
                 "SELECT part_id, category, subcategory, name, description, created_date, modified_date
                  FROM Parts
@@ -437,7 +437,7 @@ impl<'a> PartManager<'a> {
             for part_result in parts_iter {
                 parts.push(part_result?);
             }
-            Ok(parts)
+            Ok::<Vec<Part>, DatabaseError>(parts)
         }).map_err(DatabaseError::from)
     }
 
@@ -455,7 +455,7 @@ impl<'a> PartManager<'a> {
     ///
     /// Returns a DatabaseError if the part could not be updated
     pub fn update_part(&self, part: &Part) -> DatabaseResult<()> {
-        self.connection_manager.execute_mut(|conn| {
+        self.connection_manager.execute_mut::<_, _, DatabaseError>(|conn| {
             // Convert SystemTime to seconds since UNIX_EPOCH for SQLite
             let modified_secs = part.modified_date
                 .duration_since(UNIX_EPOCH)
@@ -475,7 +475,7 @@ impl<'a> PartManager<'a> {
                     modified_secs,
                 ],
             )?;
-            Ok(())
+            Ok::<(), DatabaseError>(())
         }).map_err(DatabaseError::from)
     }
 
@@ -493,12 +493,12 @@ impl<'a> PartManager<'a> {
     ///
     /// Returns a DatabaseError if the part could not be deleted
     pub fn delete_part(&self, part_id: i64) -> DatabaseResult<()> {
-        self.connection_manager.execute_mut(|conn| {
+        self.connection_manager.execute_mut::<_, _, DatabaseError>(|conn| {
             conn.execute(
                 "DELETE FROM Parts WHERE part_id = ?1",
                 params![part_id],
             )?;
-            Ok(())
+            Ok::<(), DatabaseError>(())
         }).map_err(DatabaseError::from)
     }
 
@@ -525,7 +525,7 @@ impl<'a> PartManager<'a> {
         let category_code = parts[0];
         let subcategory_code = parts[1];
         
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             // Find parts with matching category and subcategory codes
             let mut stmt = conn.prepare(
                 "SELECT p.part_id, p.category, p.subcategory, p.name, p.description, p.created_date, p.modified_date
@@ -540,7 +540,7 @@ impl<'a> PartManager<'a> {
             for part_result in parts_iter {
                 parts.push(part_result?);
             }
-            Ok(parts)
+            Ok::<Vec<Part>, DatabaseError>(parts)
         }).map_err(DatabaseError::from)
     }
 

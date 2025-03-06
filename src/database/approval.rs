@@ -155,7 +155,7 @@ impl<'a> ApprovalManager<'a> {
     ///
     /// Returns a DatabaseError if the approval could not be created
     pub fn create_approval(&self, approval: &Approval) -> DatabaseResult<i64> {
-        self.connection_manager.execute_mut(|conn| {
+        self.connection_manager.execute_mut::<_, _, DatabaseError>(|conn| {
             // Convert SystemTime to seconds since UNIX_EPOCH for SQLite
             let date_secs = approval.date.map(|d| {
                 d.duration_since(UNIX_EPOCH)
@@ -174,7 +174,7 @@ impl<'a> ApprovalManager<'a> {
                     approval.comments,
                 ],
             )?;
-            Ok(conn.last_insert_rowid())
+            Ok::<i64, DatabaseError>(conn.last_insert_rowid())
         }).map_err(DatabaseError::from)
     }
     
@@ -228,7 +228,7 @@ impl<'a> ApprovalManager<'a> {
     ///
     /// Returns a DatabaseError if the approval could not be found
     pub fn get_approval(&self, approval_id: i64) -> DatabaseResult<Approval> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let approval = conn.query_row(
                 "SELECT approval_id, revision_id, approver, status, date, comments
                  FROM Approvals
@@ -236,7 +236,7 @@ impl<'a> ApprovalManager<'a> {
                 params![approval_id],
                 |row| self.row_to_approval(row),
             )?;
-            Ok(approval)
+            Ok::<Approval, DatabaseError>(approval)
         }).map_err(DatabaseError::from)
     }
 
@@ -279,7 +279,7 @@ impl<'a> ApprovalManager<'a> {
     ///
     /// Returns a DatabaseError if the approvals could not be retrieved
     pub fn get_approvals_for_revision(&self, revision_id: i64) -> DatabaseResult<Vec<Approval>> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let mut stmt = conn.prepare(
                 "SELECT approval_id, revision_id, approver, status, date, comments
                  FROM Approvals
@@ -291,7 +291,7 @@ impl<'a> ApprovalManager<'a> {
             for approval_result in approvals_iter {
                 approvals.push(approval_result?);
             }
-            Ok(approvals)
+            Ok::<Vec<Approval>, DatabaseError>(approvals)
         }).map_err(DatabaseError::from)
     }
 
@@ -339,7 +339,7 @@ impl<'a> ApprovalManager<'a> {
     ///
     /// Returns a DatabaseError if the approval could not be found
     pub fn get_approval_for_revision_and_approver(&self, revision_id: i64, approver: &str) -> DatabaseResult<Approval> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let approval = conn.query_row(
                 "SELECT approval_id, revision_id, approver, status, date, comments
                  FROM Approvals
@@ -347,7 +347,7 @@ impl<'a> ApprovalManager<'a> {
                 params![revision_id, approver],
                 |row| self.row_to_approval(row),
             )?;
-            Ok(approval)
+            Ok::<Approval, DatabaseError>(approval)
         }).map_err(DatabaseError::from)
     }
 
@@ -393,7 +393,7 @@ impl<'a> ApprovalManager<'a> {
     ///
     /// Returns a DatabaseError if the status could not be updated
     pub fn update_status(&self, approval_id: i64, status: ApprovalStatus, comments: Option<&str>) -> DatabaseResult<()> {
-        self.connection_manager.execute_mut(|conn| {
+        self.connection_manager.execute_mut::<_, _, DatabaseError>(|conn| {
             let date = if status == ApprovalStatus::Pending {
                 None
             } else {
@@ -418,7 +418,7 @@ impl<'a> ApprovalManager<'a> {
                     comments,
                 ],
             )?;
-            Ok(())
+            Ok::<(), DatabaseError>(())
         }).map_err(DatabaseError::from)
     }
     
@@ -480,12 +480,12 @@ impl<'a> ApprovalManager<'a> {
     ///
     /// Returns a DatabaseError if the approval could not be deleted
     pub fn delete_approval(&self, approval_id: i64) -> DatabaseResult<()> {
-        self.connection_manager.execute_mut(|conn| {
+        self.connection_manager.execute_mut::<_, _, DatabaseError>(|conn| {
             conn.execute(
                 "DELETE FROM Approvals WHERE approval_id = ?1",
                 params![approval_id],
             )?;
-            Ok(())
+            Ok::<(), DatabaseError>(())
         }).map_err(DatabaseError::from)
     }
     

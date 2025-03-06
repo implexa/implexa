@@ -158,7 +158,7 @@ impl<'a> RevisionManager<'a> {
     ///
     /// Returns a DatabaseError if the revision could not be created
     pub fn create_revision(&self, revision: &Revision) -> DatabaseResult<i64> {
-        self.connection_manager.execute_mut(|conn| {
+        self.connection_manager.execute_mut::<_, _, DatabaseError>(|conn| {
             // Convert SystemTime to seconds since UNIX_EPOCH for SQLite
             let created_secs = revision.created_date
                 .duration_since(UNIX_EPOCH)
@@ -177,7 +177,7 @@ impl<'a> RevisionManager<'a> {
                     revision.commit_hash,
                 ],
             )?;
-            Ok(conn.last_insert_rowid())
+            Ok::<i64, DatabaseError>(conn.last_insert_rowid())
         }).map_err(DatabaseError::from)
     }
     
@@ -231,7 +231,7 @@ impl<'a> RevisionManager<'a> {
     ///
     /// Returns a DatabaseError if the revision could not be found
     pub fn get_revision(&self, revision_id: i64) -> DatabaseResult<Revision> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let revision = conn.query_row(
                 "SELECT revision_id, part_id, version, status, created_date, created_by, commit_hash
                  FROM Revisions
@@ -239,7 +239,7 @@ impl<'a> RevisionManager<'a> {
                 params![revision_id],
                 |row| self.row_to_revision(row),
             )?;
-            Ok(revision)
+            Ok::<Revision, DatabaseError>(revision)
         }).map_err(DatabaseError::from)
     }
 
@@ -282,7 +282,7 @@ impl<'a> RevisionManager<'a> {
     ///
     /// Returns a DatabaseError if the revisions could not be retrieved
     pub fn get_revisions_for_part(&self, part_id: &str) -> DatabaseResult<Vec<Revision>> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let mut stmt = conn.prepare(
                 "SELECT revision_id, part_id, version, status, created_date, created_by, commit_hash
                  FROM Revisions
@@ -294,7 +294,7 @@ impl<'a> RevisionManager<'a> {
             for revision_result in revisions_iter {
                 revisions.push(revision_result?);
             }
-            Ok(revisions)
+            Ok::<Vec<Revision>, DatabaseError>(revisions)
         }).map_err(DatabaseError::from)
     }
 
@@ -312,7 +312,7 @@ impl<'a> RevisionManager<'a> {
     ///
     /// Returns a DatabaseError if the revision could not be retrieved
     pub fn get_latest_revision(&self, part_id: &str) -> DatabaseResult<Revision> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let revision = conn.query_row(
                 "SELECT revision_id, part_id, version, status, created_date, created_by, commit_hash
                  FROM Revisions
@@ -322,7 +322,7 @@ impl<'a> RevisionManager<'a> {
                 params![part_id],
                 |row| self.row_to_revision(row),
             )?;
-            Ok(revision)
+            Ok::<Revision, DatabaseError>(revision)
         }).map_err(DatabaseError::from)
     }
 
@@ -368,14 +368,14 @@ impl<'a> RevisionManager<'a> {
     ///
     /// Returns a DatabaseError if the status could not be updated
     pub fn update_status(&self, revision_id: i64, status: RevisionStatus) -> DatabaseResult<()> {
-        self.connection_manager.execute_mut(|conn| {
+        self.connection_manager.execute_mut::<_, _, DatabaseError>(|conn| {
             conn.execute(
                 "UPDATE Revisions
                  SET status = ?2
                  WHERE revision_id = ?1",
                 params![revision_id, status.to_str()],
             )?;
-            Ok(())
+            Ok::<(), DatabaseError>(())
         }).map_err(DatabaseError::from)
     }
 
@@ -419,14 +419,14 @@ impl<'a> RevisionManager<'a> {
     ///
     /// Returns a DatabaseError if the commit hash could not be updated
     pub fn update_commit_hash(&self, revision_id: i64, commit_hash: &str) -> DatabaseResult<()> {
-        self.connection_manager.execute_mut(|conn| {
+        self.connection_manager.execute_mut::<_, _, DatabaseError>(|conn| {
             conn.execute(
                 "UPDATE Revisions
                  SET commit_hash = ?2
                  WHERE revision_id = ?1",
                 params![revision_id, commit_hash],
             )?;
-            Ok(())
+            Ok::<(), DatabaseError>(())
         }).map_err(DatabaseError::from)
     }
 
@@ -469,7 +469,7 @@ impl<'a> RevisionManager<'a> {
     ///
     /// Returns a DatabaseError if the version number could not be determined
     pub fn get_next_version(&self, part_id: &str) -> DatabaseResult<String> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let max_version: Option<String> = conn.query_row(
                 "SELECT MAX(version)
                  FROM Revisions
@@ -481,12 +481,12 @@ impl<'a> RevisionManager<'a> {
             if let Some(version) = max_version {
                 // Parse the version and increment it
                 if let Ok(num) = version.parse::<u32>() {
-                    return Ok((num + 1).to_string());
+                    return Ok::<String, DatabaseError>((num + 1).to_string());
                 }
             }
 
             // If no version exists or parsing failed, start with "1"
-            Ok("1".to_string())
+            Ok::<String, DatabaseError>("1".to_string())
         }).map_err(DatabaseError::from)
     }
 

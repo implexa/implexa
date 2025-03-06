@@ -192,7 +192,7 @@ impl<'a> PropertyManager<'a> {
     ///
     /// Returns a DatabaseError if the property could not be created
     pub fn create_property(&self, property: &Property) -> DatabaseResult<i64> {
-        self.connection_manager.execute_mut(|conn| {
+        self.connection_manager.execute_mut::<_, _, DatabaseError>(|conn| {
             conn.execute(
                 "INSERT INTO Properties (part_id, revision_id, key, value, type)
                  VALUES (?1, ?2, ?3, ?4, ?5)",
@@ -204,7 +204,7 @@ impl<'a> PropertyManager<'a> {
                     property.property_type.to_str(),
                 ],
             )?;
-            Ok(conn.last_insert_rowid())
+            Ok::<i64, DatabaseError>(conn.last_insert_rowid())
         }).map_err(DatabaseError::from)
     }
     
@@ -251,7 +251,7 @@ impl<'a> PropertyManager<'a> {
     ///
     /// Returns a DatabaseError if the property could not be found
     pub fn get_property(&self, property_id: i64) -> DatabaseResult<Property> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let property = conn.query_row(
                 "SELECT property_id, part_id, revision_id, key, value, type
                  FROM Properties
@@ -259,7 +259,7 @@ impl<'a> PropertyManager<'a> {
                 params![property_id],
                 |row| self.row_to_property(row),
             )?;
-            Ok(property)
+            Ok::<Property, DatabaseError>(property)
         }).map_err(DatabaseError::from)
     }
     
@@ -302,7 +302,7 @@ impl<'a> PropertyManager<'a> {
     ///
     /// Returns a DatabaseError if the properties could not be retrieved
     pub fn get_part_properties(&self, part_id: &str) -> DatabaseResult<Vec<Property>> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let mut stmt = conn.prepare(
                 "SELECT property_id, part_id, revision_id, key, value, type
                  FROM Properties
@@ -314,7 +314,7 @@ impl<'a> PropertyManager<'a> {
             for property_result in properties_iter {
                 properties.push(property_result?);
             }
-            Ok(properties)
+            Ok::<Vec<Property>, DatabaseError>(properties)
         }).map_err(DatabaseError::from)
     }
     
@@ -361,7 +361,7 @@ impl<'a> PropertyManager<'a> {
     ///
     /// Returns a DatabaseError if the properties could not be retrieved
     pub fn get_revision_properties(&self, revision_id: i64) -> DatabaseResult<Vec<Property>> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let mut stmt = conn.prepare(
                 "SELECT property_id, part_id, revision_id, key, value, type
                  FROM Properties
@@ -373,7 +373,7 @@ impl<'a> PropertyManager<'a> {
             for property_result in properties_iter {
                 properties.push(property_result?);
             }
-            Ok(properties)
+            Ok::<Vec<Property>, DatabaseError>(properties)
         }).map_err(DatabaseError::from)
     }
     
@@ -421,7 +421,7 @@ impl<'a> PropertyManager<'a> {
     ///
     /// Returns a DatabaseError if the property could not be found
     pub fn get_part_property(&self, part_id: &str, key: &str) -> DatabaseResult<Property> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let property = conn.query_row(
                 "SELECT property_id, part_id, revision_id, key, value, type
                  FROM Properties
@@ -429,7 +429,7 @@ impl<'a> PropertyManager<'a> {
                 params![part_id, key],
                 |row| self.row_to_property(row),
             )?;
-            Ok(property)
+            Ok::<Property, DatabaseError>(property)
         }).map_err(DatabaseError::from)
     }
     
@@ -474,7 +474,7 @@ impl<'a> PropertyManager<'a> {
     ///
     /// Returns a DatabaseError if the property could not be found
     pub fn get_revision_property(&self, revision_id: i64, key: &str) -> DatabaseResult<Property> {
-        self.connection_manager.execute(|conn| {
+        self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let property = conn.query_row(
                 "SELECT property_id, part_id, revision_id, key, value, type
                  FROM Properties
@@ -482,7 +482,7 @@ impl<'a> PropertyManager<'a> {
                 params![revision_id, key],
                 |row| self.row_to_property(row),
             )?;
-            Ok(property)
+            Ok::<Property, DatabaseError>(property)
         }).map_err(DatabaseError::from)
     }
     
@@ -530,7 +530,7 @@ impl<'a> PropertyManager<'a> {
             DatabaseError::InitializationError("Property ID is required for update".to_string())
         })?;
 
-        self.connection_manager.execute_mut(|conn| {
+        self.connection_manager.execute_mut::<_, _, DatabaseError>(|conn| {
             conn.execute(
                 "UPDATE Properties
                  SET part_id = ?2, revision_id = ?3, key = ?4, value = ?5, type = ?6
@@ -544,7 +544,7 @@ impl<'a> PropertyManager<'a> {
                     property.property_type.to_str(),
                 ],
             )?;
-            Ok(())
+            Ok::<(), DatabaseError>(())
         }).map_err(DatabaseError::from)
     }
     
@@ -597,12 +597,12 @@ impl<'a> PropertyManager<'a> {
     ///
     /// Returns a DatabaseError if the property could not be deleted
     pub fn delete_property(&self, property_id: i64) -> DatabaseResult<()> {
-        self.connection_manager.execute_mut(|conn| {
+        self.connection_manager.execute_mut::<_, _, DatabaseError>(|conn| {
             conn.execute(
                 "DELETE FROM Properties WHERE property_id = ?1",
                 params![property_id],
             )?;
-            Ok(())
+            Ok::<(), DatabaseError>(())
         }).map_err(DatabaseError::from)
     }
     

@@ -60,7 +60,7 @@ pub struct ManufacturerPart {
     /// Unique identifier for the manufacturer part
     pub mpn_id: Option<i64>,
     /// ID of the part this manufacturer part is associated with
-    pub part_id: String,
+    pub part_id: i64,
     /// Manufacturer name
     pub manufacturer: String,
     /// Manufacturer part number
@@ -86,7 +86,7 @@ impl ManufacturerPart {
     ///
     /// A new ManufacturerPart instance
     pub fn new(
-        part_id: String,
+        part_id: i64,
         manufacturer: String,
         mpn: String,
         description: Option<String>,
@@ -496,7 +496,7 @@ mod tests {
 
         // Create a new manufacturer part
         let manufacturer_part = ManufacturerPart::new(
-            "ELE-RES-001".to_string(),
+            10001, // Use the same part_id as the part we created above
             "Yageo".to_string(),
             "RC0603FR-0710KL".to_string(),
             Some("10K Ohm ±1% 0.1W, 1/10W Chip Resistor 0603 (1608 Metric)".to_string()),

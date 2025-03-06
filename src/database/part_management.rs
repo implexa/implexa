@@ -195,9 +195,9 @@ impl<'a> PartManagementManager<'a> {
         
         // Use a transaction for the entire operation
         self.connection_manager.transaction::<_, _, PartManagementError>(|tx| {
-            // Create part managers for this transaction
-            let part_manager = PartManager::new_with_transaction(tx);
-            let revision_manager = RevisionManager::new_with_transaction(tx);
+            // Create part managers
+            let part_manager = PartManager::new(self.connection_manager);
+            let revision_manager = RevisionManager::new(self.connection_manager);
             
             // Create the part
             let part_id = part_manager.get_next_part_id_in_transaction(tx)?;
@@ -216,7 +216,7 @@ impl<'a> PartManagementManager<'a> {
             
             // Create a new revision in Draft state
             let revision = Revision::new(
-                part.part_id.to_string(),
+                part.part_id,
                 "1".to_string(),
                 RevisionStatus::Draft,
                 self.current_user.username.clone(),
@@ -260,8 +260,8 @@ impl<'a> PartManagementManager<'a> {
     ) -> PartManagementResult<()> {
         self.connection_manager.transaction::<_, _, PartManagementError>(|tx| {
             // Create managers
-            let revision_manager = RevisionManager::new_with_transaction(tx);
-            let approval_manager = ApprovalManager::new_with_transaction(tx);
+            let revision_manager = RevisionManager::new(self.connection_manager);
+            let approval_manager = ApprovalManager::new(self.connection_manager);
             
             // Get the revision
             let revision = revision_manager.get_revision_in_transaction(revision_id, tx)?;
@@ -281,8 +281,8 @@ impl<'a> PartManagementManager<'a> {
             }
             
             // Get the part
-            let part_manager = PartManager::new_with_transaction(tx);
-            let part = part_manager.get_part_in_transaction(revision.part_id.parse::<i64>().unwrap(), tx)?;
+            let part_manager = PartManager::new(self.connection_manager);
+            let part = part_manager.get_part_in_transaction(revision.part_id, tx)?;
             
             // Generate the display part number
             let display_part_number = part.display_part_number(tx);
@@ -336,8 +336,8 @@ impl<'a> PartManagementManager<'a> {
     ) -> PartManagementResult<()> {
         self.connection_manager.transaction::<_, _, PartManagementError>(|tx| {
             // Create managers
-            let revision_manager = RevisionManager::new_with_transaction(tx);
-            let approval_manager = ApprovalManager::new_with_transaction(tx);
+            let revision_manager = RevisionManager::new(self.connection_manager);
+            let approval_manager = ApprovalManager::new(self.connection_manager);
             
             // Get the revision
             let revision = revision_manager.get_revision_in_transaction(revision_id, tx)?;
@@ -409,8 +409,8 @@ impl<'a> PartManagementManager<'a> {
     ) -> PartManagementResult<()> {
         self.connection_manager.transaction::<_, _, PartManagementError>(|tx| {
             // Create managers
-            let revision_manager = RevisionManager::new_with_transaction(tx);
-            let approval_manager = ApprovalManager::new_with_transaction(tx);
+            let revision_manager = RevisionManager::new(self.connection_manager);
+            let approval_manager = ApprovalManager::new(self.connection_manager);
             
             // Get the revision
             let revision = revision_manager.get_revision_in_transaction(revision_id, tx)?;
@@ -485,9 +485,9 @@ impl<'a> PartManagementManager<'a> {
     ) -> PartManagementResult<()> {
         self.connection_manager.transaction::<_, _, PartManagementError>(|tx| {
             // Create managers
-            let revision_manager = RevisionManager::new_with_transaction(tx);
-            let approval_manager = ApprovalManager::new_with_transaction(tx);
-            let part_manager = PartManager::new_with_transaction(tx);
+            let revision_manager = RevisionManager::new(self.connection_manager);
+            let approval_manager = ApprovalManager::new(self.connection_manager);
+            let part_manager = PartManager::new(self.connection_manager);
             
             // Get the revision
             let revision = revision_manager.get_revision_in_transaction(revision_id, tx)?;
@@ -514,7 +514,7 @@ impl<'a> PartManagementManager<'a> {
             }
             
             // Get the part
-            let part = part_manager.get_part_in_transaction(revision.part_id.parse::<i64>().unwrap(), tx)?;
+            let part = part_manager.get_part_in_transaction(revision.part_id, tx)?;
             
             // Generate the display part number
             let display_part_number = part.display_part_number(tx);
@@ -554,7 +554,7 @@ impl<'a> PartManagementManager<'a> {
     ) -> PartManagementResult<()> {
         self.connection_manager.transaction::<_, _, PartManagementError>(|tx| {
             // Create managers
-            let revision_manager = RevisionManager::new_with_transaction(tx);
+            let revision_manager = RevisionManager::new(self.connection_manager);
             
             // Get the revision
             let revision = revision_manager.get_revision_in_transaction(revision_id, tx)?;
@@ -601,8 +601,8 @@ impl<'a> PartManagementManager<'a> {
     ) -> PartManagementResult<i64> {
         self.connection_manager.transaction::<_, _, PartManagementError>(|tx| {
             // Create managers
-            let part_manager = PartManager::new_with_transaction(tx);
-            let revision_manager = RevisionManager::new_with_transaction(tx);
+            let part_manager = PartManager::new(self.connection_manager);
+            let revision_manager = RevisionManager::new(self.connection_manager);
             
             // Get the part
             let part = part_manager.get_part_in_transaction(part_id, tx)?;
@@ -615,7 +615,7 @@ impl<'a> PartManagementManager<'a> {
             }
             
             // Get the latest revision
-            let latest_revision = revision_manager.get_latest_revision_in_transaction(&part_id.to_string(), tx)?;
+            let latest_revision = revision_manager.get_latest_revision_in_transaction(part_id, tx)?;
             
             // Check if the latest revision is in Released state
             if latest_revision.status != RevisionStatus::Released {
@@ -625,13 +625,13 @@ impl<'a> PartManagementManager<'a> {
             }
             
             // Get the next version number
-            let next_version = revision_manager.get_next_version_in_transaction(&part_id.to_string(), tx)?;
+            let next_version = revision_manager.get_next_version_in_transaction(part_id, tx)?;
             
             // Generate the display part number
             let display_part_number = part.display_part_number(tx);
             
-            // Create a new feature branch from main
-            let branch_name = format!("part/{}/draft", display_part_number);
+            // Create a new feature branch from main - include version number to make it unique
+            let branch_name = format!("part/{}/v{}/draft", display_part_number, next_version);
             // Open the repository first
             let repo = self.git_manager.open_repository(repo_path)?;
             self.git_manager.checkout_branch(&repo, "main")?;
@@ -640,7 +640,7 @@ impl<'a> PartManagementManager<'a> {
             
             // Create a new revision in Draft state
             let revision = Revision::new(
-                part_id.to_string(),
+                part_id,
                 next_version,
                 RevisionStatus::Draft,
                 self.current_user.username.clone(),
@@ -675,7 +675,7 @@ impl<'a> PartManagementManager<'a> {
     ) -> PartManagementResult<()> {
         self.connection_manager.transaction::<_, _, PartManagementError>(|tx| {
             // Create a revision manager
-            let revision_manager = RevisionManager::new_with_transaction(tx);
+            let revision_manager = RevisionManager::new(self.connection_manager);
             
             // Get the revision
             let revision = revision_manager.get_revision_in_transaction(revision_id, tx)?;
@@ -717,7 +717,7 @@ impl<'a> PartManagementManager<'a> {
             let approval_manager = ApprovalManager::new(self.connection_manager);
             
             // Get all revisions for the part
-            let revisions = revision_manager.get_revisions_for_part(&part_id.to_string())?;
+            let revisions = revision_manager.get_revisions_for_part(part_id)?;
             
             // Get approvals for each revision
             let mut result = Vec::new();
@@ -762,7 +762,23 @@ mod tests {
         let git_manager = GitBackendManager::new(git_config, auth_config).unwrap();
         
         // Initialize a Git repository
-        git_manager.init_repository(repo_path).unwrap();
+        let repo = git_manager.init_repository(repo_path).unwrap();
+        
+        // Create an initial commit so that the main branch exists
+        // This is needed for later operations in the test that require a branch
+        let sig = git2::Signature::now("Test User", "test@example.com").unwrap();
+        let tree_id = {
+            let mut index = repo.index().unwrap();
+            index.write_tree().unwrap()
+        };
+        let tree = repo.find_tree(tree_id).unwrap();
+        let commit_id = repo.commit(Some("refs/heads/main"), &sig, &sig, "Initial commit", &tree, &[]).unwrap();
+        
+        // Explicitly set HEAD to point to the main branch
+        repo.set_head("refs/heads/main").unwrap();
+        
+        // Make sure default branch is correctly set
+        let _main_branch = repo.find_branch("main", git2::BranchType::Local).unwrap();
         
         // Create a user
         let user = User::new("test_user".to_string(), UserRole::Designer);

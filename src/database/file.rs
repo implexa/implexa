@@ -76,7 +76,7 @@ pub struct File {
     /// Unique identifier for the file
     pub file_id: Option<i64>,
     /// ID of the part this file is associated with (if applicable)
-    pub part_id: Option<String>,
+    pub part_id: Option<i64>,
     /// ID of the revision this file is associated with (if applicable)
     pub revision_id: Option<i64>,
     /// Path to the file
@@ -101,7 +101,7 @@ impl File {
     ///
     /// A new File instance
     pub fn new_part_file(
-        part_id: String,
+        part_id: i64,
         path: PathBuf,
         file_type: FileType,
         description: Option<String>,
@@ -572,7 +572,7 @@ mod tests {
 
         // Create a new file
         let file = File::new_part_file(
-            "ELE-RES-001".to_string(),
+            10001, // Use the same part_id as the part we created above
             PathBuf::from("design/resistor.kicad_sch"),
             FileType::Design,
             Some("KiCad schematic for 10K resistor".to_string()),
@@ -620,7 +620,7 @@ mod tests {
 
         // Create a new revision
         let revision = Revision::new(
-            "ELE-RES-001".to_string(),
+            10001, // Use the same part_id as the part we created above
             "1".to_string(),
             RevisionStatus::Draft,
             "test_user".to_string(),

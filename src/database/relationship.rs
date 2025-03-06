@@ -63,9 +63,9 @@ pub struct Relationship {
     /// Unique identifier for the relationship
     pub relationship_id: Option<i64>,
     /// ID of the parent part
-    pub parent_part_id: String,
+    pub parent_part_id: i64,
     /// ID of the child part
-    pub child_part_id: String,
+    pub child_part_id: i64,
     /// Type of relationship
     pub relationship_type: RelationshipType,
     /// Quantity of child parts in the relationship
@@ -86,8 +86,8 @@ impl Relationship {
     ///
     /// A new Relationship instance
     pub fn new(
-        parent_part_id: String,
-        child_part_id: String,
+        parent_part_id: i64,
+        child_part_id: i64,
         relationship_type: RelationshipType,
         quantity: i64,
     ) -> Self {
@@ -446,8 +446,8 @@ mod tests {
 
         // Create a relationship
         let relationship = Relationship::new(
-            "ASM-PCB-001".to_string(),
-            "ELE-RES-001".to_string(),
+            10002, // Use the same parent_part_id as we created above
+            10003, // Use the same child_part_id as we created above
             RelationshipType::Assembly,
             10,
         );

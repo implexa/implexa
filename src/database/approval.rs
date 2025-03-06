@@ -642,7 +642,7 @@ mod tests {
 
         // Create a new revision
         let revision = Revision::new(
-            "ELE-RES-001".to_string(),
+            10001, // Use the same part_id as the part we created above
             "1".to_string(),
             RevisionStatus::InReview,
             "test_user".to_string(),
@@ -702,7 +702,7 @@ mod tests {
 
         // Create a new revision
         let revision = Revision::new(
-            "ELE-RES-001".to_string(),
+            10001, // Use the same part_id as the part we created above
             "1".to_string(),
             RevisionStatus::InReview,
             "test_user".to_string(),

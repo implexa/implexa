@@ -72,7 +72,7 @@ pub struct Property {
     /// Unique identifier for the property
     pub property_id: Option<i64>,
     /// ID of the part this property belongs to (if applicable)
-    pub part_id: Option<String>,
+    pub part_id: Option<i64>,
     /// ID of the revision this property belongs to (if applicable)
     pub revision_id: Option<i64>,
     /// Key of the property
@@ -97,7 +97,7 @@ impl Property {
     ///
     /// A new Property instance
     pub fn new_part_property(
-        part_id: String,
+        part_id: i64,
         key: String,
         value: Option<String>,
         property_type: PropertyType,
@@ -693,7 +693,7 @@ mod tests {
 
         // Create a new property
         let property = Property::new_part_property(
-            "ELE-RES-001".to_string(),
+            10001, // Use the same part_id as the part we created above
             "resistance".to_string(),
             Some("10000".to_string()),
             PropertyType::Integer,
@@ -741,7 +741,7 @@ mod tests {
 
         // Create a new revision
         let revision = Revision::new(
-            "ELE-RES-001".to_string(),
+            10001, // Use the same part_id as the part we created above
             "1".to_string(),
             RevisionStatus::Draft,
             "test_user".to_string(),

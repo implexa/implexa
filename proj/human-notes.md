@@ -7,6 +7,7 @@
 - part categories should be configurable in a cfg file
 - Move to Tauri 2.0 (not sure why we are on Tauri 1.5?)
 - Do we need to split some of the file into smaller ones?
+- Remove all things that are for backwards compatibility
 
 
 

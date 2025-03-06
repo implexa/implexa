@@ -61,7 +61,7 @@ pub struct Revision {
     /// Unique identifier for the revision
     pub revision_id: Option<i64>,
     /// ID of the part this revision belongs to
-    pub part_id: String,
+    pub part_id: i64,
     /// Version of the revision
     pub version: String,
     /// Status of the revision
@@ -89,7 +89,7 @@ impl Revision {
     ///
     /// A new Revision instance
     pub fn new(
-        part_id: String,
+        part_id: i64,
         version: String,
         status: RevisionStatus,
         created_by: String,
@@ -281,7 +281,7 @@ impl<'a> RevisionManager<'a> {
     /// # Errors
     ///
     /// Returns a DatabaseError if the revisions could not be retrieved
-    pub fn get_revisions_for_part(&self, part_id: &str) -> DatabaseResult<Vec<Revision>> {
+    pub fn get_revisions_for_part(&self, part_id: i64) -> DatabaseResult<Vec<Revision>> {
         self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let mut stmt = conn.prepare(
                 "SELECT revision_id, part_id, version, status, created_date, created_by, commit_hash
@@ -311,7 +311,7 @@ impl<'a> RevisionManager<'a> {
     /// # Errors
     ///
     /// Returns a DatabaseError if the revision could not be retrieved
-    pub fn get_latest_revision(&self, part_id: &str) -> DatabaseResult<Revision> {
+    pub fn get_latest_revision(&self, part_id: i64) -> DatabaseResult<Revision> {
         self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let revision = conn.query_row(
                 "SELECT revision_id, part_id, version, status, created_date, created_by, commit_hash
@@ -340,7 +340,7 @@ impl<'a> RevisionManager<'a> {
     /// # Errors
     ///
     /// Returns a DatabaseError if the revision could not be retrieved
-    pub fn get_latest_revision_in_transaction(&self, part_id: &str, tx: &Transaction) -> DatabaseResult<Revision> {
+    pub fn get_latest_revision_in_transaction(&self, part_id: i64, tx: &Transaction) -> DatabaseResult<Revision> {
         let revision = tx.query_row(
             "SELECT revision_id, part_id, version, status, created_date, created_by, commit_hash
              FROM Revisions
@@ -468,7 +468,7 @@ impl<'a> RevisionManager<'a> {
     /// # Errors
     ///
     /// Returns a DatabaseError if the version number could not be determined
-    pub fn get_next_version(&self, part_id: &str) -> DatabaseResult<String> {
+    pub fn get_next_version(&self, part_id: i64) -> DatabaseResult<String> {
         self.connection_manager.execute::<_, _, DatabaseError>(|conn| {
             let max_version: Option<String> = conn.query_row(
                 "SELECT MAX(version)
@@ -504,7 +504,7 @@ impl<'a> RevisionManager<'a> {
     /// # Errors
     ///
     /// Returns a DatabaseError if the version number could not be determined
-    pub fn get_next_version_in_transaction(&self, part_id: &str, tx: &Transaction) -> DatabaseResult<String> {
+    pub fn get_next_version_in_transaction(&self, part_id: i64, tx: &Transaction) -> DatabaseResult<String> {
         let max_version: Option<String> = tx.query_row(
             "SELECT MAX(version)
              FROM Revisions
@@ -590,10 +590,9 @@ mod tests {
 
         // Save the part to the database
         part_manager.create_part(&part).unwrap();
-
         // Create a new revision
         let revision = Revision::new(
-            "ELE-RES-001".to_string(),
+            10001, // Use the same part_id as the part we created above
             "1".to_string(),
             RevisionStatus::Draft,
             "test_user".to_string(),

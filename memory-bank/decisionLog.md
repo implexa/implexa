@@ -390,6 +390,7 @@ This document tracks key architectural decisions made during the development of 
 - [Rust Module Refactoring Guide](./rust-module-refactoring-guide.md) - Guide for module organization
 - [Unit Testing Approach](./unit-testing-approach.md) - Testing philosophy and practices
 - [Coding Standards](./coding-standards.md) - Code style and practices
+- [Dual Crate Structure Fix Guide](./dual-crate-structure-fix.md) - Guide for fixing import paths
 
 ## Decision Index by Component
 
@@ -417,12 +418,20 @@ This document tracks key architectural decisions made during the development of 
 - [DEC-015](./decisionLog.md#dec-015---directory-structure-implementation-approach) - Directory Structure Implementation Approach
 - [DEC-003](./decisionLog.md#dec-003---memory-bank-initialization) - Memory Bank Initialization
 
+### Architecture & Project Structure
+- [DEC-001](./decisionLog.md#dec-001---use-of-tauri-over-electron) - Use of Tauri over Electron
+- [DEC-003](./decisionLog.md#dec-003---memory-bank-initialization) - Memory Bank Initialization
+- [DEC-008](./decisionLog.md#dec-008---directory-structure-design) - Directory Structure Design
+- [DEC-010](./decisionLog.md#dec-010---rust-module-organization-pattern) - Rust Module Organization Pattern
+- [DEC-015](./decisionLog.md#dec-015---directory-structure-implementation-approach) - Directory Structure Implementation Approach
+- [DEC-017](./decisionLog.md#dec-017---tauri-desktop-application-implementation) - Tauri Desktop Application Implementation
+- [DEC-020](./decisionLog.md#dec-020---dual-crate-structure-import-paths) - Dual Crate Structure Import Paths
+
 ### Development Practices
 - [DEC-012](./decisionLog.md#dec-012---unit-testing-approach) - Unit Testing Approach
-- [DEC-001](./decisionLog.md#dec-001---use-of-tauri-over-electron) - Use of Tauri over Electron
 - [DEC-002](./decisionLog.md#dec-002---enhanced-hybrid-part-numbering-schema) - Enhanced Hybrid Part Numbering Schema
+- [DEC-012](./decisionLog.md#dec-012---unit-testing-approach) - Unit Testing Approach
 - [DEC-016](./decisionLog.md#dec-016---debugging-and-code-quality-improvements) - Debugging and Code Quality Improvements
-- [DEC-017](./decisionLog.md#dec-017---tauri-desktop-application-implementation) - Tauri Desktop Application Implementation
 
 ### DEC-016 - Debugging and Code Quality Improvements
 - **Date:** 2025-03-04
@@ -506,3 +515,21 @@ This document tracks key architectural decisions made during the development of 
   - Negative: Interior mutability adds some complexity to the codebase
   - Negative: Potential for runtime borrow errors if not used carefully
 - **References:** activeContext.md, progress.md, src/database/part.rs, src/database/part_management.rs, src/database/schema.rs, database-connection-refactoring-guide.md
+
+### DEC-020 - Dual Crate Structure Import Paths
+- **Date:** 2025-03-06
+- **Status:** Implemented
+- **Context:** The Implexa project has a dual crate structure with a library crate (`lib.rs`) exporting core functionality and a binary crate (`main.rs`) implementing the Tauri application. Command files in the binary crate were incorrectly accessing functionality from the library crate using `crate::` imports instead of `implexa::` imports.
+- **Decision:** Fix all import paths in command files by changing `crate::` imports to `implexa::` imports to properly reflect the architectural relationship between the binary crate and the library crate.
+- **Alternatives:**
+  - **Restructure as a single crate:** Would simplify imports but eliminate the benefits of the dual crate architecture
+  - **Move all command files into the library crate:** Would avoid the issue but blur the boundary between library and application code
+  - **Use re-exports in the binary crate:** Would avoid changing imports but add complexity and indirection
+- **Consequences:**
+  - **Positive:** Correctly reflects the architectural relationship between crates
+  - **Positive:** Allows command files to properly access functionality from the library crate
+  - **Positive:** Maintains the benefits of the dual crate structure (separation of concerns, code reuse, better testing, clear interfaces)
+  - **Positive:** Makes the codebase more maintainable as it grows
+  - **Negative:** Required changes to multiple files
+  - **Negative:** May require similar vigilance for future command files
+- **References:** dual-crate-structure-fix.md, src/commands.rs, src/part_commands.rs, src/relationship_commands.rs, src/revision_commands.rs, src/workflow_commands.rs, src/file_commands.rs, src/approval_commands.rs, src/manufacturer_part_commands.rs, src/property_commands.rs

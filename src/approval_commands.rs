@@ -6,9 +6,10 @@
 use std::sync::Mutex;
 use tauri::{command, State};
 use serde::{Serialize, Deserialize};
-use crate::database::approval::{ApprovalManager, Approval, ApprovalStatus};
-use crate::database::connection_manager::ConnectionManager;
+use implexa::database::approval::{ApprovalManager, Approval, ApprovalStatus};
+use implexa::database::connection_manager::ConnectionManager;
 use std::time::{SystemTime, UNIX_EPOCH};
+use chrono;
 
 /// Approval data structure for the frontend
 #[derive(Debug, Clone, Serialize, Deserialize)]

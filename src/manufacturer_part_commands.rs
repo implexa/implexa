@@ -6,8 +6,8 @@
 use std::sync::Mutex;
 use tauri::{command, State};
 use serde::{Serialize, Deserialize};
-use crate::database::manufacturer_part::{ManufacturerPartManager, ManufacturerPart, ManufacturerPartStatus};
-use crate::database::connection_manager::ConnectionManager;
+use implexa::database::manufacturer_part::{ManufacturerPartManager, ManufacturerPart, ManufacturerPartStatus};
+use implexa::database::connection_manager::ConnectionManager;
 
 /// Manufacturer part information for the frontend
 #[derive(Debug, Clone, Serialize, Deserialize)]

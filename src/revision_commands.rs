@@ -6,8 +6,8 @@
 use std::sync::Mutex;
 use tauri::{command, State};
 use serde::{Serialize, Deserialize};
-use crate::database::revision::{RevisionManager, Revision, RevisionStatus};
-use crate::database::connection_manager::ConnectionManager;
+use implexa::database::revision::{RevisionManager, Revision, RevisionStatus};
+use implexa::database::connection_manager::ConnectionManager;
 
 /// Revision information for the frontend
 #[derive(Debug, Clone, Serialize, Deserialize)]

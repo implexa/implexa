@@ -6,8 +6,8 @@
 use std::sync::Mutex;
 use tauri::{command, State};
 use serde::{Serialize, Deserialize};
-use crate::database::relationship::{RelationshipManager, Relationship, RelationshipType};
-use crate::database::connection_manager::ConnectionManager;
+use implexa::database::relationship::{RelationshipManager, Relationship, RelationshipType};
+use implexa::database::connection_manager::ConnectionManager;
 
 /// Relationship information for the frontend
 #[derive(Debug, Clone, Serialize, Deserialize)]

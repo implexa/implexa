@@ -7,8 +7,8 @@ use std::sync::Mutex;
 use std::path::PathBuf;
 use tauri::{command, State};
 use serde::{Serialize, Deserialize};
-use crate::database::file::{FileManager, File, FileType};
-use crate::database::connection_manager::ConnectionManager;
+use implexa::database::file::{FileManager, File, FileType};
+use implexa::database::connection_manager::ConnectionManager;
 
 /// File information for the frontend
 #[derive(Debug, Clone, Serialize, Deserialize)]

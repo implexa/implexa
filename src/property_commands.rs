@@ -6,8 +6,8 @@
 use std::sync::Mutex;
 use tauri::{command, State};
 use serde::{Serialize, Deserialize};
-use crate::database::property::{PropertyManager, Property, PropertyType};
-use crate::database::connection_manager::ConnectionManager;
+use implexa::database::property::{PropertyManager, Property, PropertyType};
+use implexa::database::connection_manager::ConnectionManager;
 
 /// Property information for the frontend
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -6,9 +6,9 @@
 use std::sync::Mutex;
 use tauri::{command, State};
 use serde::{Serialize, Deserialize};
-use crate::database::part_management::PartManagementManager;
-use crate::database::part::Part;
-use crate::database::connection_manager::ConnectionManager;
+use implexa::database::part_management::PartManagementManager;
+use implexa::database::part::Part;
+use implexa::database::connection_manager::ConnectionManager;
 
 /// Part information for the frontend
 #[derive(Debug, Clone, Serialize, Deserialize)]

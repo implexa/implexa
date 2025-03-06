@@ -2,11 +2,11 @@
 //!
 //! This module contains the command handlers for the Tauri application.
 //! These commands are exposed to the frontend and allow it to interact with the backend.
-
 use std::path::Path;
 use std::sync::Mutex;
 use tauri::{command, State};
 use serde::{Serialize, Deserialize};
+use crate::git_backend::directory::TemplateType;
 use crate::{GitBackendManager, GitBackendConfig, AuthConfig, RepositoryInfo};
 
 /// Repository information for the frontend
@@ -73,9 +73,9 @@ pub async fn create_repository(
     
     // Create a part directory with the specified template
     let template_type = match template_type.as_str() {
-        "minimal" => crate::git_backend::directory::TemplateType::Minimal,
-        "extended" => crate::git_backend::directory::TemplateType::Extended,
-        _ => crate::git_backend::directory::TemplateType::Standard,
+        "minimal" => TemplateType::Minimal,
+        "extended" => TemplateType::Extended,
+        _ => TemplateType::Standard,
     };
     
     // Get repository info

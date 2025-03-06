@@ -28,6 +28,8 @@ path-clean = "1.0.1"
 tauri = { version = "1.5.4", features = [ "dialog-all", "path-all", "shell-open", "fs-all", "window-all"] }
 # Hashing
 md5 = "0.7.0"
+# Date and time handling
+chrono = { version = "0.4.35", features = ["serde"] }
 
 [dev-dependencies]
 # Temporary file handling for tests

@@ -6,9 +6,9 @@
 use std::sync::Mutex;
 use tauri::{command, State};
 use serde::{Serialize, Deserialize};
-use crate::database::workflow::{WorkflowManager, Workflow, WorkflowState, WorkflowTransition};
-use crate::database::connection_manager::ConnectionManager;
-use crate::database::schema::DatabaseResult;
+use implexa::database::workflow::{WorkflowManager, Workflow, WorkflowState as DbWorkflowState, WorkflowTransition};
+use implexa::database::connection_manager::ConnectionManager;
+use implexa::database::schema::DatabaseResult;
 
 /// Workflow data structure for the frontend
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -126,8 +126,8 @@ impl From<Workflow> for WorkflowDto {
     }
 }
 
-impl From<WorkflowState> for WorkflowStateDto {
-    fn from(state: WorkflowState) -> Self {
+impl From<DbWorkflowState> for WorkflowStateDto {
+    fn from(state: DbWorkflowState) -> Self {
         Self {
             state_id: state.state_id.unwrap_or_default(),
             workflow_id: state.workflow_id,
@@ -370,7 +370,7 @@ pub async fn create_workflow_state(
     let workflow_manager = workflow_state.workflow_manager.lock().map_err(|e| e.to_string())?;
     
     // Create a new state
-    let state = crate::database::workflow::WorkflowState {
+    let state = DbWorkflowState {
         state_id: None,
         workflow_id: state_data.workflow_id,
         name: state_data.name,
@@ -401,7 +401,7 @@ pub async fn update_workflow_state(
     let workflow_manager = workflow_state.workflow_manager.lock().map_err(|e| e.to_string())?;
     
     // Create an updated state
-    let state = crate::database::workflow::WorkflowState {
+    let state = DbWorkflowState {
         state_id: Some(state_id),
         workflow_id: state_data.workflow_id,
         name: state_data.name,
@@ -502,7 +502,7 @@ pub async fn create_workflow_transition(
     let workflow_manager = workflow_state.workflow_manager.lock().map_err(|e| e.to_string())?;
     
     // Create a new transition
-    let transition = crate::database::workflow::WorkflowTransition {
+    let transition = WorkflowTransition {
         transition_id: None,
         workflow_id: transition_data.workflow_id,
         from_state_id: transition_data.from_state_id,
@@ -534,7 +534,7 @@ pub async fn update_workflow_transition(
     let workflow_manager = workflow_state.workflow_manager.lock().map_err(|e| e.to_string())?;
     
     // Create an updated transition
-    let transition = crate::database::workflow::WorkflowTransition {
+    let transition = WorkflowTransition {
         transition_id: Some(transition_id),
         workflow_id: transition_data.workflow_id,
         from_state_id: transition_data.from_state_id,

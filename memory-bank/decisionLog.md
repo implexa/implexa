@@ -347,6 +347,37 @@ This document tracks key architectural decisions made during the development of 
   - Negative: Multiple templates require maintenance and documentation
 - **References:** directory-structure.md, src/git_backend/repository.rs
 
+### DEC-019 - UI Command Interface Implementation
+- **Date:** 2025-03-06
+- **Status:** Implemented
+- **Context:** The project had developed robust backend functionality in Rust for repository management, part management, workflow handling, approvals, manufacturer parts, properties, and files. However, this functionality needed to be exposed to the frontend React application through the Tauri commands API to make it accessible to the user interface.
+- **Decision:** Implement a comprehensive set of Tauri command interfaces for all backend modules using a consistent pattern of state management and data transfer object (DTO) structures:
+  1. Create separate command modules for each major backend functionality area
+  2. Use strongly-typed DTOs for data exchange between frontend and backend
+  3. Implement proper state management using Tauri's State API
+  4. Use a consistent error handling approach across all command interfaces
+  5. Structure commands to follow RESTful-like patterns when appropriate
+
+- **Alternatives:**
+  - **Monolithic command module:** Simpler file structure but less maintainable as the application grows
+  - **Thinner commands with more frontend logic:** Less backend code but more duplication in the frontend
+  - **GraphQL-style API:** More flexible querying but adds complexity
+  - **Direct FFI calls:** More performant but less type-safe and harder to maintain
+  - **Web API with HTTP endpoints:** More familiar to web developers but adds unnecessary network overhead for a desktop app
+
+- **Consequences:**
+  - **Positive:** Clean separation of concerns with domain-specific command modules
+  - **Positive:** Strongly-typed DTOs provide clear interface contracts between frontend and backend
+  - **Positive:** Consistent pattern makes extending the system easier
+  - **Positive:** State management ensures proper resource lifecycle and sharing
+  - **Positive:** RESTful-like patterns provide familiar structure for frontend developers
+  - **Positive:** Error handling provides clear feedback to the user
+  - **Negative:** More boilerplate code compared to more dynamic approaches
+  - **Negative:** Requires careful synchronization of DTOs between frontend and backend types
+  - **Negative:** Potential for proliferation of similar command interfaces
+
+- **References:** src/workflow_commands.rs, src/approval_commands.rs, src/manufacturer_part_commands.rs, src/property_commands.rs, src/file_commands.rs, src/main.rs
+
 ## Related Files
 - [Product Context](./productContext.md) - Project overview and high-level design
 - [Active Context](./activeContext.md) - Current session focus and recent activities
@@ -379,6 +410,7 @@ This document tracks key architectural decisions made during the development of 
 
 ### User Interface
 - [DEC-007](./decisionLog.md#dec-007---user-interface-architecture) - User Interface Architecture
+- [DEC-019](./decisionLog.md#dec-019---ui-command-interface-implementation) - UI Command Interface Implementation
 
 ### Project Structure
 - [DEC-008](./decisionLog.md#dec-008---directory-structure-design) - Directory Structure Design

@@ -18,3 +18,4 @@
 - review the first 15k tokens that get sent.. what are they? why do they get resent on a mode change?
 - for code: when refactoring a file do all the changes in one edit where possible
 - Have different system prompts when switching between modes. There must be some overlap in what is sent, and there could be a shared context that gets sent at the beginning and is never sent again. We only need to send the new capabilities after a mode switch.
+- Add a git commit message to the task completion message

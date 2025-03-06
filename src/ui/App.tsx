@@ -10,6 +10,8 @@ import Settings from './pages/Settings';
 import MainLayout from './layouts/MainLayout';
 import { UIProvider } from './context/UIContext';
 import { PartsProvider } from './context/PartsContext';
+import { RevisionProvider } from './context/RevisionContext';
+import { RelationshipsProvider } from './context/RelationshipsContext';
 import { WorkspaceProvider } from './context/WorkspaceContext';
 import { AuthProvider } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
@@ -25,8 +27,10 @@ function App() {
         <RepositoryProvider>
           <UIProvider>
             <PartsProvider>
-              <WorkspaceProvider>
-                <BrowserRouter>
+              <RevisionProvider>
+                <RelationshipsProvider>
+                  <WorkspaceProvider>
+                    <BrowserRouter>
                   <Routes>
                     <Route path="/" element={<MainLayout />}>
                       <Route index element={<Dashboard />} />
@@ -38,8 +42,10 @@ function App() {
                       <Route path="settings" element={<Settings />} />
                     </Route>
                   </Routes>
-                </BrowserRouter>
-              </WorkspaceProvider>
+                    </BrowserRouter>
+                  </WorkspaceProvider>
+                </RelationshipsProvider>
+              </RevisionProvider>
             </PartsProvider>
           </UIProvider>
         </RepositoryProvider>

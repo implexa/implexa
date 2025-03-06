@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useParts, Part, PartStatus } from '../context/PartsContext';
 import { useNotifications } from '../context/NotificationContext';
+import { useRelationships, Relationship, RelationshipType, RelationshipCreationData } from '../context/RelationshipsContext';
+import { useRevision, Revision, RevisionStatus, RevisionCreationData } from '../context/RevisionContext';
 import StatusBadge from '../components/StatusBadge';
 
 /**
@@ -13,10 +15,30 @@ const PartDetail: React.FC = () => {
   const navigate = useNavigate();
   const { getPart, changePartStatus, deletePart } = useParts();
   const { addNotification } = useNotifications();
+  const {
+    getParentRelationships,
+    getChildRelationships,
+    createRelationship,
+    deleteRelationship
+  } = useRelationships();
+  const {
+    getPartRevisions,
+    getLatestRevision,
+    createRevision,
+    updateRevisionStatus,
+    deleteRevision
+  } = useRevision();
   const [part, setPart] = useState<Part | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
+  const [parentRelationships, setParentRelationships] = useState<Relationship[]>([]);
+  const [childRelationships, setChildRelationships] = useState<Relationship[]>([]);
+  const [revisions, setRevisions] = useState<Revision[]>([]);
+  const [relationshipsLoading, setRelationshipsLoading] = useState(false);
+  const [revisionsLoading, setRevisionsLoading] = useState(false);
+  const [showAddRelationshipModal, setShowAddRelationshipModal] = useState(false);
+  const [showAddRevisionModal, setShowAddRevisionModal] = useState(false);
 
   // Fetch part data on component mount
   useEffect(() => {
@@ -44,6 +66,49 @@ const PartDetail: React.FC = () => {
 
     fetchPartData();
   }, [partId, getPart]);
+  
+  // Fetch relationships
+  useEffect(() => {
+    if (!part) return;
+
+    const fetchRelationships = async () => {
+      setRelationshipsLoading(true);
+      try {
+        const [parents, children] = await Promise.all([
+          getParentRelationships(part.id),
+          getChildRelationships(part.id)
+        ]);
+        
+        setParentRelationships(parents);
+        setChildRelationships(children);
+      } catch (err) {
+        console.error('Failed to fetch relationships:', err);
+      } finally {
+        setRelationshipsLoading(false);
+      }
+    };
+
+    fetchRelationships();
+  }, [part, getParentRelationships, getChildRelationships]);
+
+  // Fetch revisions
+  useEffect(() => {
+    if (!part) return;
+
+    const fetchRevisions = async () => {
+      setRevisionsLoading(true);
+      try {
+        const partRevisions = await getPartRevisions(part.id);
+        setRevisions(partRevisions);
+      } catch (err) {
+        console.error('Failed to fetch revisions:', err);
+      } finally {
+        setRevisionsLoading(false);
+      }
+    };
+
+    fetchRevisions();
+  }, [part, getPartRevisions]);
 
   // Handle status change
   const handleStatusChange = async (newStatus: PartStatus) => {
@@ -185,6 +250,16 @@ const PartDetail: React.FC = () => {
               }`}
             >
               Relationships
+            </button>
+            <button
+              onClick={() => setActiveTab('revisions')}
+              className={`py-4 px-6 text-sm font-medium ${
+                activeTab === 'revisions'
+                  ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
+                  : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              }`}
+            >
+              Revisions
             </button>
             <button
               onClick={() => setActiveTab('history')}
@@ -360,11 +435,265 @@ const PartDetail: React.FC = () => {
             <div>
               <div className="flex justify-between items-center">
                 <h2 className="text-lg font-medium text-gray-900 dark:text-white">Relationships</h2>
-                <button className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+                <button
+                  className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                  onClick={() => setShowAddRelationshipModal(true)}
+                >
                   Add Relationship
                 </button>
               </div>
-              <p className="mt-2 text-gray-600 dark:text-gray-300">No relationships defined for this part.</p>
+              
+              {relationshipsLoading ? (
+                <div className="flex justify-center items-center h-20">
+                  <p className="text-gray-500 dark:text-gray-400">Loading relationships...</p>
+                </div>
+              ) : (
+                <>
+                  <div className="mt-6">
+                    <h3 className="text-md font-medium text-gray-800 dark:text-gray-200">Where Used (Parent Assemblies)</h3>
+                    {parentRelationships.length > 0 ? (
+                      <div className="mt-2 border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
+                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                          <thead className="bg-gray-50 dark:bg-gray-800">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                Part ID
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                Relationship Type
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                Quantity
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                Description
+                              </th>
+                              <th className="relative px-6 py-3">
+                                <span className="sr-only">Actions</span>
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                            {parentRelationships.map((rel) => (
+                              <tr key={rel.relationship_id}>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                  <Link to={`/parts/${rel.parent_id}`} className="text-blue-600 hover:underline">
+                                    {rel.parent_id}
+                                  </Link>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                  {rel.relationship_type}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                  {rel.quantity} {rel.unit || ''}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                  {rel.description || '-'}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                  <button
+                                    className="text-red-600 hover:text-red-900"
+                                    onClick={() => {
+                                      if (window.confirm('Are you sure you want to delete this relationship?')) {
+                                        deleteRelationship(rel.relationship_id);
+                                      }
+                                    }}
+                                  >
+                                    Delete
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-gray-600 dark:text-gray-300">This part is not used in any assemblies.</p>
+                    )}
+                  </div>
+                  
+                  <div className="mt-6">
+                    <h3 className="text-md font-medium text-gray-800 dark:text-gray-200">Child Parts</h3>
+                    {childRelationships.length > 0 ? (
+                      <div className="mt-2 border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
+                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                          <thead className="bg-gray-50 dark:bg-gray-800">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                Part ID
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                Relationship Type
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                Quantity
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                Description
+                              </th>
+                              <th className="relative px-6 py-3">
+                                <span className="sr-only">Actions</span>
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                            {childRelationships.map((rel) => (
+                              <tr key={rel.relationship_id}>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                  <Link to={`/parts/${rel.child_id}`} className="text-blue-600 hover:underline">
+                                    {rel.child_id}
+                                  </Link>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                  {rel.relationship_type}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                  {rel.quantity} {rel.unit || ''}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                  {rel.description || '-'}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                  <button
+                                    className="text-red-600 hover:text-red-900"
+                                    onClick={() => {
+                                      if (window.confirm('Are you sure you want to delete this relationship?')) {
+                                        deleteRelationship(rel.relationship_id);
+                                      }
+                                    }}
+                                  >
+                                    Delete
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-gray-600 dark:text-gray-300">This part has no child parts.</p>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'revisions' && (
+            <div>
+              <div className="flex justify-between items-center">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">Revisions</h2>
+                <button
+                  className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                  onClick={() => setShowAddRevisionModal(true)}
+                >
+                  Create New Revision
+                </button>
+              </div>
+              
+              {revisionsLoading ? (
+                <div className="flex justify-center items-center h-20">
+                  <p className="text-gray-500 dark:text-gray-400">Loading revisions...</p>
+                </div>
+              ) : (
+                <>
+                  {revisions.length > 0 ? (
+                    <div className="mt-4 border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
+                      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead className="bg-gray-50 dark:bg-gray-800">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              Version
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              Status
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              Created By
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              Commit
+                            </th>
+                            <th className="relative px-6 py-3">
+                              <span className="sr-only">Actions</span>
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                          {revisions.map((rev) => (
+                            <tr key={rev.revision_id}>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                {rev.version}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                  ${rev.status === 'Released' ? 'bg-green-100 text-green-800' :
+                                    rev.status === 'InReview' ? 'bg-yellow-100 text-yellow-800' :
+                                    rev.status === 'Obsolete' ? 'bg-gray-100 text-gray-800' :
+                                    'bg-blue-100 text-blue-800'}`}>
+                                  {rev.status}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                {rev.created_by}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                {rev.commit_hash ? rev.commit_hash.substring(0, 7) : '-'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                {rev.status === 'Draft' && (
+                                  <button
+                                    className="text-blue-600 hover:text-blue-900 mr-3"
+                                    onClick={() => updateRevisionStatus(rev.revision_id, 'InReview')}
+                                  >
+                                    Submit for Review
+                                  </button>
+                                )}
+                                {rev.status === 'InReview' && (
+                                  <>
+                                    <button
+                                      className="text-green-600 hover:text-green-900 mr-3"
+                                      onClick={() => updateRevisionStatus(rev.revision_id, 'Released')}
+                                    >
+                                      Release
+                                    </button>
+                                    <button
+                                      className="text-yellow-600 hover:text-yellow-900 mr-3"
+                                      onClick={() => updateRevisionStatus(rev.revision_id, 'Draft')}
+                                    >
+                                      Return to Draft
+                                    </button>
+                                  </>
+                                )}
+                                {rev.status === 'Released' && (
+                                  <button
+                                    className="text-gray-600 hover:text-gray-900 mr-3"
+                                    onClick={() => updateRevisionStatus(rev.revision_id, 'Obsolete')}
+                                  >
+                                    Obsolete
+                                  </button>
+                                )}
+                                <button
+                                  className="text-red-600 hover:text-red-900"
+                                  onClick={() => {
+                                    if (window.confirm('Are you sure you want to delete this revision?')) {
+                                      deleteRevision(rev.revision_id);
+                                    }
+                                  }}
+                                >
+                                  Delete
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-gray-600 dark:text-gray-300">No revisions available for this part.</p>
+                  )}
+                </>
+              )}
             </div>
           )}
 

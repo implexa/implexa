@@ -2,7 +2,7 @@
 //!
 //! This module provides functionality for managing approvals of revisions in the database.
 
-use rusqlite::{Connection, Transaction, params, Row, Result as SqliteResult};
+use rusqlite::{Transaction, params, Row, Result as SqliteResult};
 use std::time::{SystemTime, UNIX_EPOCH};
 use crate::database::schema::{DatabaseResult, DatabaseError};
 use crate::database::connection_manager::ConnectionManager;

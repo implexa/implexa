@@ -3,13 +3,10 @@
 //! This module provides functionality for managing parts throughout their lifecycle,
 //! including creation, status transitions, and workflow enforcement.
 
-use rusqlite::{Connection, params, Result as SqliteResult};
-use std::time::SystemTime;
-use crate::database::schema::{DatabaseError, DatabaseResult};
+use crate::database::schema::DatabaseError;
 use crate::database::part::{Part, PartManager};
 use crate::database::revision::{Revision, RevisionStatus, RevisionManager};
 use crate::database::approval::{Approval, ApprovalStatus, ApprovalManager};
-use crate::database::workflow::{WorkflowManager};
 use crate::git_backend::{GitBackendManager, GitBackendError};
 use crate::database::connection_manager::ConnectionManager;
 use std::path::Path;

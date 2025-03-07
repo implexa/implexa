@@ -3,8 +3,7 @@
 //! This module handles repository initialization, cloning, and configuration.
 //! It provides functionality for managing repository structure and organization.
 
-use std::path::{Path, PathBuf};
-use git2::{Repository, RepositoryState};
+use git2::Repository;
 use crate::git_backend::{GitBackendConfig, GitBackendError, Result, RepositoryInfo, RepositorySettings};
 
 /// Repository Manager

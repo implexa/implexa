@@ -5,7 +5,6 @@
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use rusqlite::{Connection, Transaction};
-use crate::database::schema::{DatabaseError, DatabaseResult};
 
 /// Errors that can occur when using the connection manager
 #[derive(thiserror::Error, Debug)]

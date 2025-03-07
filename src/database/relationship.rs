@@ -2,7 +2,7 @@
 //!
 //! This module provides functionality for managing relationships between parts in the database.
 
-use rusqlite::{Connection, Transaction, params, Row, Result as SqliteResult};
+use rusqlite::{Transaction, params, Row, Result as SqliteResult};
 use crate::database::schema::{DatabaseError, DatabaseResult};
 use crate::database::connection_manager::ConnectionManager;
 

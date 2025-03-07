@@ -2,7 +2,7 @@
 //!
 //! This module provides functionality for managing categories and subcategories in the database.
 
-use rusqlite::{Connection, Transaction, params, Row, Result as SqliteResult};
+use rusqlite::{params, Row, Result as SqliteResult};
 use crate::database::schema::DatabaseResult;
 use crate::database::connection_manager::ConnectionManager;
 

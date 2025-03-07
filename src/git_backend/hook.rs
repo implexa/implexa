@@ -4,9 +4,9 @@
 //! for setting up and managing Git hooks, providing hook templates for common PLM workflows,
 //! and ensuring hooks are maintained across repository operations.
 
-use std::path::{Path, PathBuf};
-use std::fs::{self, File, OpenOptions};
-use std::io::{self, Write};
+use std::path::PathBuf;
+use std::fs::{self, OpenOptions};
+use std::io::{Write};
 use std::os::windows::fs::OpenOptionsExt;
 use git2::Repository;
 use crate::git_backend::{GitBackendConfig, GitBackendError, Result, HookType};

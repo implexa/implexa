@@ -5,7 +5,7 @@
 //! and maintains operation history and audit trail.
 
 use std::path::{Path, PathBuf};
-use git2::{Repository, Oid, Branch, Commit, Signature, BranchType, ObjectType, MergeOptions, MergeAnalysis};
+use git2::{Repository, Oid, Branch, Commit, BranchType, MergeOptions};
 use crate::git_backend::{GitBackendConfig, GitBackendError, Result, MergeResult};
 
 /// Operation Handler

@@ -4,7 +4,6 @@
 //! It configures and manages Git-LFS, handles LFS pointer files and object storage,
 //! and optimizes storage and retrieval of large files.
 
-use std::path::{Path, PathBuf};
 use std::process::Command;
 use git2::Repository;
 use crate::git_backend::{GitBackendConfig, GitBackendError, Result, LfsStatus};

@@ -4,7 +4,7 @@
 //! for managing Git authentication and credentials, supporting multiple authentication methods
 //! (SSH, HTTPS, tokens), and securely storing and retrieving credentials.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use git2::{Cred, CredentialType};
 use crate::git_backend::{GitBackendError, Result, Credentials, AuthConfig};
 

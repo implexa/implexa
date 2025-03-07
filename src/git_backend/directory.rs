@@ -5,7 +5,6 @@
 
 use std::path::{Path, PathBuf};
 use std::fs;
-use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 use crate::git_backend::{GitBackendConfig, GitBackendError, Result};
 

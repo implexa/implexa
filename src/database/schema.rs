@@ -3,7 +3,7 @@
 //! This module provides functionality for managing the SQLite database schema,
 //! including initialization, migrations, and version management.
 
-use rusqlite::{Connection, Error as SqliteError, params};
+use rusqlite::{Error as SqliteError, params};
 use std::path::Path;
 use thiserror::Error;
 use crate::database::connection_manager::ConnectionManager;

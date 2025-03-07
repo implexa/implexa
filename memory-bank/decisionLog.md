@@ -378,61 +378,6 @@ This document tracks key architectural decisions made during the development of 
 
 - **References:** src/workflow_commands.rs, src/approval_commands.rs, src/manufacturer_part_commands.rs, src/property_commands.rs, src/file_commands.rs, src/main.rs
 
-## Related Files
-- [Product Context](./productContext.md) - Project overview and high-level design
-- [Active Context](./activeContext.md) - Current session focus and recent activities
-- [Progress Tracking](./progress.md) - Project status and task list
-- [Git Backend Architecture](./git-backend-architecture.md) - Git backend component design
-- [Database Schema Design](./database-schema-design.md) - SQLite database schema design
-- [Part Management Workflow](./part-management-workflow.md) - Part lifecycle workflow design
-- [User Interface Architecture](./user-interface-architecture.md) - UI design and components
-- [Directory Structure](./directory-structure.md) - File and directory organization
-- [Rust Module Refactoring Guide](./rust-module-refactoring-guide.md) - Guide for module organization
-- [Unit Testing Approach](./unit-testing-approach.md) - Testing philosophy and practices
-- [Coding Standards](./coding-standards.md) - Code style and practices
-- [Dual Crate Structure Fix Guide](./dual-crate-structure-fix.md) - Guide for fixing import paths
-
-## Decision Index by Component
-
-### Git Backend
-- [DEC-010](./decisionLog.md#dec-010---rust-module-organization-pattern) - Rust Module Organization Pattern
-- [DEC-004](./decisionLog.md#dec-004---git-backend-manager-architecture) - Git Backend Manager Architecture
-- [DEC-009](./decisionLog.md#dec-009---git-backend-manager-implementation) - Git Backend Manager Implementation
-
-### Database
-- [DEC-005](./decisionLog.md#dec-005---sqlite-database-schema-design) - SQLite Database Schema Design
-- [DEC-011](./decisionLog.md#dec-011---database-schema-implementation) - Database Schema Implementation
-- [DEC-013](./decisionLog.md#dec-013---enhanced-part-numbering-system) - Enhanced Part Numbering System
-- [DEC-018](./decisionLog.md#dec-018---database-connection-management-refactoring) - Database Connection Management Refactoring
-
-### Part Management
-- [DEC-006](./decisionLog.md#dec-006---part-management-workflow-design) - Part Management Workflow Design
-- [DEC-014](./decisionLog.md#dec-014---part-management-implementation) - Part Management Implementation
-
-### User Interface
-- [DEC-007](./decisionLog.md#dec-007---user-interface-architecture) - User Interface Architecture
-- [DEC-019](./decisionLog.md#dec-019---ui-command-interface-implementation) - UI Command Interface Implementation
-
-### Project Structure
-- [DEC-008](./decisionLog.md#dec-008---directory-structure-design) - Directory Structure Design
-- [DEC-015](./decisionLog.md#dec-015---directory-structure-implementation-approach) - Directory Structure Implementation Approach
-- [DEC-003](./decisionLog.md#dec-003---memory-bank-initialization) - Memory Bank Initialization
-
-### Architecture & Project Structure
-- [DEC-001](./decisionLog.md#dec-001---use-of-tauri-over-electron) - Use of Tauri over Electron
-- [DEC-003](./decisionLog.md#dec-003---memory-bank-initialization) - Memory Bank Initialization
-- [DEC-008](./decisionLog.md#dec-008---directory-structure-design) - Directory Structure Design
-- [DEC-010](./decisionLog.md#dec-010---rust-module-organization-pattern) - Rust Module Organization Pattern
-- [DEC-015](./decisionLog.md#dec-015---directory-structure-implementation-approach) - Directory Structure Implementation Approach
-- [DEC-017](./decisionLog.md#dec-017---tauri-desktop-application-implementation) - Tauri Desktop Application Implementation
-- [DEC-020](./decisionLog.md#dec-020---dual-crate-structure-import-paths) - Dual Crate Structure Import Paths
-
-### Development Practices
-- [DEC-012](./decisionLog.md#dec-012---unit-testing-approach) - Unit Testing Approach
-- [DEC-002](./decisionLog.md#dec-002---enhanced-hybrid-part-numbering-schema) - Enhanced Hybrid Part Numbering Schema
-- [DEC-012](./decisionLog.md#dec-012---unit-testing-approach) - Unit Testing Approach
-- [DEC-016](./decisionLog.md#dec-016---debugging-and-code-quality-improvements) - Debugging and Code Quality Improvements
-
 ### DEC-016 - Debugging and Code Quality Improvements
 - **Date:** 2025-03-04
 - **Status:** Implemented
@@ -533,3 +478,83 @@ This document tracks key architectural decisions made during the development of 
   - **Negative:** Required changes to multiple files
   - **Negative:** May require similar vigilance for future command files
 - **References:** dual-crate-structure-fix.md, src/commands.rs, src/part_commands.rs, src/relationship_commands.rs, src/revision_commands.rs, src/workflow_commands.rs, src/file_commands.rs, src/approval_commands.rs, src/manufacturer_part_commands.rs, src/property_commands.rs
+
+### DEC-021 - Thread Safety in SQLite Connection Management
+- **Date:** 2025-03-06
+- **Status:** Implemented
+- **Context:** A critical thread safety issue was discovered in our SQLite connection management approach. The `ConnectionManager` using `RwLock` for thread-safe interior mutability was insufficient because `rusqlite::Connection` itself internally uses `RefCell` for its connection and statement cache, making it incompatible with Tauri's requirement that state objects implement the `Send + Sync` traits for thread safety.
+- **Decision:** Implement a single connection with a standard synchronous Mutex approach, which uses SQLite's Write-Ahead Logging (WAL) mode to improve concurrency for readers. This synchronous mutex-based approach is appropriate given the specific usage pattern of Implexa, where write access will only ever happen with a single user on a single computer and Git is the primary mechanism for sharing data between users.
+- **Alternatives:**
+  - **Connection Pool Approach:** Use r2d2 and r2d2_sqlite to create a pool of connections. Initially considered the best solution but determined to be overkill for the current usage pattern.
+  - **Async Mutex Approach:** Protect a single connection with an async mutex from tokio. Would require rewriting to async/await paradigm across the codebase.
+  - **Thread-Local Storage:** Use thread-local storage to maintain separate connections for each thread. Complicated lifecycle management and harder error handling.
+  - **Maintain Current Approach:** Keep the current approach but limit database access to a single thread. Would severely limit application functionality.
+- **Consequences:**
+  - **Positive:** Simplest implementation that directly solves the thread safety issue
+  - **Positive:** No async rewrite required, maintaining existing synchronous API
+  - **Positive:** No additional dependencies beyond standard library
+  - **Positive:** WAL mode provides improved concurrency for readers
+  - **Positive:** Keeps existing ConnectionManager API with minimal changes
+  - **Positive:** Aligns with application's single-user-per-instance usage pattern
+  - **Negative:** Only one database operation can execute at a time (write operations)
+  - **Negative:** Limited scalability if usage patterns change (e.g., multiple concurrent users)
+  - **Negative:** Potential for blocking UI if operations take a long time
+- **References:** thread-safety-issues.md, sqlite-thread-safety-approaches.md, connection-pool-implementation-guide.md, src/database/connection_manager.rs
+
+## Related Files
+- [Product Context](./productContext.md) - Project overview and high-level design
+- [Active Context](./activeContext.md) - Current session focus and recent activities
+- [Progress Tracking](./progress.md) - Project status and task list
+- [Git Backend Architecture](./git-backend-architecture.md) - Git backend component design
+- [Database Schema Design](./database-schema-design.md) - SQLite database schema design
+- [Part Management Workflow](./part-management-workflow.md) - Part lifecycle workflow design
+- [User Interface Architecture](./user-interface-architecture.md) - UI design and components
+- [Directory Structure](./directory-structure.md) - File and directory organization
+- [Rust Module Refactoring Guide](./rust-module-refactoring-guide.md) - Guide for module organization
+- [Unit Testing Approach](./unit-testing-approach.md) - Testing philosophy and practices
+- [Coding Standards](./coding-standards.md) - Code style and practices
+- [Dual Crate Structure Fix Guide](./dual-crate-structure-fix.md) - Guide for fixing import paths
+- [Thread Safety Issues](./thread-safety-issues.md) - Analysis of thread safety issues in SQLite connection management
+- [SQLite Thread Safety Approaches](./sqlite-thread-safety-approaches.md) - Comparison of approaches for SQLite thread safety
+
+## Decision Index by Component
+
+### Git Backend
+- [DEC-010](./decisionLog.md#dec-010---rust-module-organization-pattern) - Rust Module Organization Pattern
+- [DEC-004](./decisionLog.md#dec-004---git-backend-manager-architecture) - Git Backend Manager Architecture
+- [DEC-009](./decisionLog.md#dec-009---git-backend-manager-implementation) - Git Backend Manager Implementation
+
+### Database
+- [DEC-005](./decisionLog.md#dec-005---sqlite-database-schema-design) - SQLite Database Schema Design
+- [DEC-011](./decisionLog.md#dec-011---database-schema-implementation) - Database Schema Implementation
+- [DEC-013](./decisionLog.md#dec-013---enhanced-part-numbering-system) - Enhanced Part Numbering System
+- [DEC-018](./decisionLog.md#dec-018---database-connection-management-refactoring) - Database Connection Management Refactoring
+- [DEC-021](./decisionLog.md#dec-021---thread-safety-in-sqlite-connection-management) - Thread Safety in SQLite Connection Management
+
+### Part Management
+- [DEC-006](./decisionLog.md#dec-006---part-management-workflow-design) - Part Management Workflow Design
+- [DEC-014](./decisionLog.md#dec-014---part-management-implementation) - Part Management Implementation
+
+### User Interface
+- [DEC-007](./decisionLog.md#dec-007---user-interface-architecture) - User Interface Architecture
+- [DEC-019](./decisionLog.md#dec-019---ui-command-interface-implementation) - UI Command Interface Implementation
+
+### Project Structure
+- [DEC-008](./decisionLog.md#dec-008---directory-structure-design) - Directory Structure Design
+- [DEC-015](./decisionLog.md#dec-015---directory-structure-implementation-approach) - Directory Structure Implementation Approach
+- [DEC-003](./decisionLog.md#dec-003---memory-bank-initialization) - Memory Bank Initialization
+
+### Architecture & Project Structure
+- [DEC-001](./decisionLog.md#dec-001---use-of-tauri-over-electron) - Use of Tauri over Electron
+- [DEC-003](./decisionLog.md#dec-003---memory-bank-initialization) - Memory Bank Initialization
+- [DEC-008](./decisionLog.md#dec-008---directory-structure-design) - Directory Structure Design
+- [DEC-010](./decisionLog.md#dec-010---rust-module-organization-pattern) - Rust Module Organization Pattern
+- [DEC-015](./decisionLog.md#dec-015---directory-structure-implementation-approach) - Directory Structure Implementation Approach
+- [DEC-017](./decisionLog.md#dec-017---tauri-desktop-application-implementation) - Tauri Desktop Application Implementation
+- [DEC-020](./decisionLog.md#dec-020---dual-crate-structure-import-paths) - Dual Crate Structure Import Paths
+
+### Development Practices
+- [DEC-012](./decisionLog.md#dec-012---unit-testing-approach) - Unit Testing Approach
+- [DEC-002](./decisionLog.md#dec-002---enhanced-hybrid-part-numbering-schema) - Enhanced Hybrid Part Numbering Schema
+- [DEC-012](./decisionLog.md#dec-012---unit-testing-approach) - Unit Testing Approach
+- [DEC-016](./decisionLog.md#dec-016---debugging-and-code-quality-improvements) - Debugging and Code Quality Improvements

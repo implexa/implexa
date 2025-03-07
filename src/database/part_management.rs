@@ -212,7 +212,7 @@ impl<'a> PartManagementManager<'a> {
             part_manager.create_part_in_transaction(&part, tx)?;
             
             // Generate the display part number
-            let display_part_number = part.display_part_number(tx);
+            let display_part_number = part.display_part_number_in_transaction(tx);
             
             // Create a new revision in Draft state
             let revision = Revision::new(
@@ -285,7 +285,7 @@ impl<'a> PartManagementManager<'a> {
             let part = part_manager.get_part_in_transaction(revision.part_id, tx)?;
             
             // Generate the display part number
-            let display_part_number = part.display_part_number(tx);
+            let display_part_number = part.display_part_number_in_transaction(tx);
             
             // Create a review branch
             let feature_branch = format!("part/{}/draft", display_part_number);
@@ -517,7 +517,7 @@ impl<'a> PartManagementManager<'a> {
             let part = part_manager.get_part_in_transaction(revision.part_id, tx)?;
             
             // Generate the display part number
-            let display_part_number = part.display_part_number(tx);
+            let display_part_number = part.display_part_number_in_transaction(tx);
             
             // Checkout the main branch
             // Open the repository first
@@ -628,7 +628,7 @@ impl<'a> PartManagementManager<'a> {
             let next_version = revision_manager.get_next_version_in_transaction(part_id, tx)?;
             
             // Generate the display part number
-            let display_part_number = part.display_part_number(tx);
+            let display_part_number = part.display_part_number_in_transaction(tx);
             
             // Create a new feature branch from main - include version number to make it unique
             let branch_name = format!("part/{}/v{}/draft", display_part_number, next_version);

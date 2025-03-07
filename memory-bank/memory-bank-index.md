@@ -12,6 +12,8 @@ This index provides a categorized list of all documentation in the memory bank f
 - [Git Backend Architecture](./git-backend-architecture.md) - Design of the Git backend component
 - [Database Schema Design](./database-schema-design.md) - SQLite database schema design
 - [Database Connection Refactoring Guide](./database-connection-refactoring-guide.md) - Guide for refactoring database connection management
+- [Thread Safety Issues](./thread-safety-issues.md) - Analysis of thread safety issues in SQLite connection management
+- [SQLite Thread Safety Approaches](./sqlite-thread-safety-approaches.md) - Comparison of approaches for SQLite thread safety
 - [Part Management Workflow](./part-management-workflow.md) - Part lifecycle workflow design
 - [User Interface Architecture](./user-interface-architecture.md) - UI design and components
 - [Directory Structure](./directory-structure.md) - File and directory organization
@@ -43,7 +45,7 @@ When starting a new context, AI assistants should prioritize reading:
 
 ### For Specific Tasks
 - **Working on Git Backend**: Read [Git Backend Architecture](./git-backend-architecture.md)
-- **Working on Database**: Read [Database Schema Design](./database-schema-design.md)
+- **Working on Database**: Read [Database Schema Design](./database-schema-design.md), [Thread Safety Issues](./thread-safety-issues.md), and [SQLite Thread Safety Approaches](./sqlite-thread-safety-approaches.md)
 - **Working on Part Management**: Read [Part Management Workflow](./part-management-workflow.md)
 - **Working on UI**: Read [User Interface Architecture](./user-interface-architecture.md)
 - **Setting up Directory Structure**: Read [Directory Structure](./directory-structure.md)

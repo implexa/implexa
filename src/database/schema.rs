@@ -59,9 +59,9 @@ impl DatabaseManager {
     ///
     /// Returns a DatabaseError if the connection cannot be established
     pub fn new<P: AsRef<Path>>(db_path: P) -> DatabaseResult<Self> {
-        let connection = Connection::open(db_path)?;
+        let connection_manager = ConnectionManager::new(db_path.as_ref())?;
         Ok(Self {
-            connection_manager: ConnectionManager::new(connection),
+            connection_manager,
         })
     }
 

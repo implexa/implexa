@@ -101,6 +101,35 @@ impl Part {
         
         format!("{}-{}-{}", category_code, subcategory_code, sequence)
     }
+
+    /// Generate a display part number using a ConnectionManager
+    ///
+    /// # Arguments
+    ///
+    /// * `conn_mgr` - Connection manager
+    /// * `category` - Category of the part
+    /// * `subcategory` - Subcategory of the part
+    /// * `sequence` - Sequential number for the part
+    ///
+    /// # Returns
+    ///
+    /// A display part number in the format "CAT-SUB-SEQUENCE"
+    pub fn generate_display_part_number_with_manager(
+        conn_mgr: &ConnectionManager,
+        category: &str,
+        subcategory: &str,
+        sequence: i64
+    ) -> String {
+        conn_mgr.execute::<_, String, rusqlite::Error>(|conn| {
+            Ok(Self::generate_display_part_number(conn, category, subcategory, sequence))
+        }).unwrap_or_else(|_: rusqlite::Error| {
+            format!("{}-{}-{}",
+                category.chars().take(2).collect::<String>().to_uppercase(),
+                subcategory.chars().take(3).collect::<String>().to_uppercase(),
+                sequence
+            )
+        })
+    }
 /// Get the display part number for this part
 ///
 /// # Arguments
@@ -110,8 +139,21 @@ impl Part {
 /// # Returns
 ///
 /// The display part number in the format "CAT-SUB-SEQUENCE"
-pub fn display_part_number(&self, connection: &rusqlite::Connection) -> String {
-    Self::generate_display_part_number(connection, &self.category, &self.subcategory, self.part_id)
+pub fn display_part_number(&self, conn_mgr: &ConnectionManager) -> String {
+    Self::generate_display_part_number_with_manager(conn_mgr, &self.category, &self.subcategory, self.part_id)
+}
+
+/// Get a display part number for use with a transaction
+///
+/// # Arguments
+///
+/// * `tx` - Database transaction
+///
+/// # Returns
+///
+/// The display part number in the format "CAT-SUB-SEQUENCE"
+pub fn display_part_number_in_transaction(&self, tx: &Transaction) -> String {
+    Self::generate_display_part_number(tx, &self.category, &self.subcategory, self.part_id)
 }
 }
 
@@ -622,8 +664,8 @@ mod tests {
         assert_eq!(retrieved_part.description, part.description);
 
         // Check the display part number format
-        let conn = db_manager.connection_manager().get_raw_connection();
-        let display_number = part.display_part_number(&conn);
+        let conn_mgr = db_manager.connection_manager();
+        let display_number = part.display_part_number(conn_mgr);
         assert!(display_number.starts_with("EL-RES-"));
         assert!(display_number.contains(&part_id.to_string()));
     }
@@ -639,9 +681,9 @@ mod tests {
         db_manager.initialize_schema().unwrap();
 
         // Test with database-defined categories
-        let conn = db_manager.connection_manager().get_raw_connection();
-        let display_number = Part::generate_display_part_number(
-            &conn,
+        let conn_mgr = db_manager.connection_manager();
+        let display_number = Part::generate_display_part_number_with_manager(
+            conn_mgr,
             "Electronic",
             "Resistor",
             10001
@@ -649,8 +691,8 @@ mod tests {
         assert_eq!(display_number, "EL-RES-10001");
 
         // Test with custom category/subcategory
-        let display_number = Part::generate_display_part_number(
-            &conn,
+        let display_number = Part::generate_display_part_number_with_manager(
+            conn_mgr,
             "Custom Category",
             "Custom Subcategory",
             10042

@@ -50,6 +50,26 @@ impl ConnectionManager {
         })
     }
     
+    /// Create a new ConnectionManager with an in-memory database
+    ///
+    /// # Returns
+    ///
+    /// A new ConnectionManager instance with an in-memory database
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the connection cannot be created
+    pub fn new_in_memory() -> Result<Self, rusqlite::Error> {
+        let connection = Connection::open_in_memory()?;
+        
+        // Note: In-memory databases don't use WAL mode, they use "MEMORY" journal mode
+        println!("Using in-memory database with 'MEMORY' journal mode");
+        
+        Ok(Self {
+            connection: Arc::new(Mutex::new(connection)),
+        })
+    }
+    
     /// Create a new ConnectionManager with an existing connection
     ///
     /// # Arguments
@@ -176,6 +196,7 @@ impl ConnectionManager {
 
 #[cfg(test)]
 pub mod test_utils {
+    use super::*;
     use std::sync::{Arc, Mutex};
     use rusqlite::{Connection, Transaction};
     use std::collections::HashMap;

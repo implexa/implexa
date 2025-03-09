@@ -14,6 +14,7 @@ This index provides a categorized list of all documentation in the memory bank f
 - [Database Connection Refactoring Guide](./database-connection-refactoring-guide.md) - Guide for refactoring database connection management
 - [Thread Safety Issues](./thread-safety-issues.md) - Analysis of thread safety issues in SQLite connection management
 - [SQLite Thread Safety Approaches](./sqlite-thread-safety-approaches.md) - Comparison of approaches for SQLite thread safety
+- [Database Initialization Fixes](./database-initialization-fixes.md) - Solution for database initialization and storage location issues
 - [SQLite Thread Safety Implementation](./sqlite-thread-safety-implementation.md) - Implementation of the thread-safe connection management solution
 - [Part Management Workflow](./part-management-workflow.md) - Part lifecycle workflow design
 - [User Interface Architecture](./user-interface-architecture.md) - UI design and components

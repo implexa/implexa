@@ -94,6 +94,7 @@ pub fn init_logging() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
     // Path is used when calling temp_dir.path() but we can explicitly cast it
     use tempfile::tempdir;
 

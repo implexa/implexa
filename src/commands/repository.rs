@@ -52,12 +52,16 @@ pub struct GitBackendState {
     pub manager: Mutex<GitBackendManager>,
 }
 
+use crate::commands::parts::DatabaseState;
+use crate::database::connection_manager::ConnectionManager;
+
 /// Create a new repository
 #[command]
 pub async fn create_repository(
     path: String,
     template_type: String,
     git_state: State<'_, GitBackendState>,
+    _db_state: State<'_, DatabaseState>,
 ) -> Result<RepositoryDto, String> {
     let manager = git_state.manager.lock().map_err(|e| e.to_string())?;
     
@@ -73,7 +77,7 @@ pub async fn create_repository(
     repo_manager.setup_plm_structure().map_err(|e| e.to_string())?;
     
     // Create a part directory with the specified template
-    let _template_type = match template_type.as_str() {
+    let _template_type_enum = match template_type.as_str() {
         "minimal" => TemplateType::Minimal,
         "extended" => TemplateType::Extended,
         _ => TemplateType::Standard,
@@ -81,6 +85,21 @@ pub async fn create_repository(
     
     // Get repository info
     let info = repo_manager.get_info().map_err(|e| e.to_string())?;
+    
+    // Create the main repository database in the config directory
+    let config_dir = Path::new(&path).join("config");
+    if !config_dir.exists() {
+        std::fs::create_dir_all(&config_dir)
+            .map_err(|e| format!("Failed to create config directory: {}", e))?;
+    }
+    
+    let db_path = config_dir.join("repository.db");
+    println!("Creating repository database at: {}", db_path.display());
+    
+    // TODO: We should update the DatabaseState to use this new connection
+    // For now, we'll just create the database file
+    let _connection_manager = ConnectionManager::new(&db_path)
+        .map_err(|e| format!("Failed to create repository database: {}", e))?;
     
     Ok(RepositoryDto::from(info))
 }
@@ -90,6 +109,7 @@ pub async fn create_repository(
 pub async fn open_repository(
     path: String,
     git_state: State<'_, GitBackendState>,
+    _db_state: State<'_, DatabaseState>,
 ) -> Result<RepositoryDto, String> {
     let manager = git_state.manager.lock().map_err(|e| e.to_string())?;
     
@@ -101,6 +121,28 @@ pub async fn open_repository(
     // Get repository info
     let repo_manager = manager.repository_manager(&repo);
     let info = repo_manager.get_info().map_err(|e| e.to_string())?;
+    
+    // Check for the repository database in the config directory
+    let config_dir = Path::new(&path).join("config");
+    let db_path = config_dir.join("repository.db");
+    
+    if db_path.exists() {
+        println!("Using existing repository database at: {}", db_path.display());
+        // TODO: We should update the DatabaseState to use this existing connection
+        let _connection_manager = ConnectionManager::new(&db_path)
+            .map_err(|e| format!("Failed to open repository database: {}", e))?;
+    } else {
+        // Create config directory if it doesn't exist
+        if !config_dir.exists() {
+            std::fs::create_dir_all(&config_dir)
+                .map_err(|e| format!("Failed to create config directory: {}", e))?;
+        }
+        
+        // Create a new repository database
+        println!("Creating repository database at: {}", db_path.display());
+        let _connection_manager = ConnectionManager::new(&db_path)
+            .map_err(|e| format!("Failed to create repository database: {}", e))?;
+    }
     
     Ok(RepositoryDto::from(info))
 }
@@ -120,6 +162,7 @@ pub async fn close_repository(
 pub async fn get_repository_info(
     path: String,
     git_state: State<'_, GitBackendState>,
+    _db_state: State<'_, DatabaseState>,
 ) -> Result<RepositoryDto, String> {
     let manager = git_state.manager.lock().map_err(|e| e.to_string())?;
     
@@ -131,6 +174,15 @@ pub async fn get_repository_info(
     // Get repository info
     let repo_manager = manager.repository_manager(&repo);
     let info = repo_manager.get_info().map_err(|e| e.to_string())?;
+    
+    // Check for database location
+    let config_dir = Path::new(&path).join("config");
+    let db_path = config_dir.join("repository.db");
+    
+    if db_path.exists() {
+        println!("Found repository database at: {}", db_path.display());
+        // TODO: Switch to this database connection
+    }
     
     Ok(RepositoryDto::from(info))
 }

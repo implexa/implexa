@@ -218,13 +218,13 @@ pub async fn delete_part(
 
 /// Initialize the database state
 pub fn init_database_state() -> DatabaseState {
-    // Get or create a database file path
-    let app_data_dir = std::env::current_dir().expect("Failed to get current directory");
-    let db_path = app_data_dir.join("implexa.db");
+    // Start with an in-memory database until a repository is opened
+    // This avoids creating files in the project directory during startup
+    println!("Initializing with in-memory database");
     
-    // Create the connection manager
-    let connection_manager = ConnectionManager::new(&db_path)
-        .expect("Failed to create database connection manager");
+    // Create an in-memory database connection manager
+    let connection_manager = ConnectionManager::new_in_memory()
+        .expect("Failed to create in-memory database connection manager");
         
     // Initialize the git backend manager
     use crate::git_backend::{GitBackendManager, GitBackendConfig, AuthConfig};

@@ -25,9 +25,55 @@ The refactoring has been successfully implemented with the following changes:
 
 ## Next Steps
 
-1. Update the Tauri command registration to properly register all commands from the library crate
+✅ 1. Update the Tauri command registration to properly register all commands from the library crate
 2. Add the `#[tauri::command]` attribute to all command functions in the library modules
+
+## Command Registration Fixes
+
+We've implemented the command registration updates with the following changes:
+
+1. Added wrapper functions in main.rs for all library commands, including:
+   - Repository commands
+   - Part commands
+   - Workspace commands
+   - Workflow commands
+   - Revision commands
+   - Relationship commands
+   - Approval commands
+   - Manufacturer Part commands
+   - Property commands
+   - File commands
+
+2. Fixed several issues that were preventing proper command registration:
+   - Fixed function signatures to match implementations in the library
+   - Added missing property-related functions (get_part_properties, get_revision_properties, etc.)
+   - Fixed bracketing errors in the invoke_handler registration
+   - Ensured all wrapper functions are properly registered in tauri::generate_handler!
+
+3. Successfully tested application startup - application now compiles and initializes correctly
 =======
+
+
+## Database Initialization and Storage Fixes
+
+Fixed an issue where the application was exiting immediately after startup due to database file creation triggering an infinite rebuild loop:
+
+1. Modified database initialization process:
+   - Application now starts with an in-memory database instead of creating files during startup
+   - Added `new_in_memory()` method to ConnectionManager for temporary database creation
+   - Improved database initialization logging
+
+2. Implemented proper repository-specific database storage:
+   - Database files are now stored within each Git repository's config directory
+   - Database files are only created when a repository is opened or created
+   - This better aligns with the architecture design document
+
+3. Enhanced repository command functions:
+   - Updated `create_repository` to create repository database in config directory
+   - Updated `open_repository` to use existing database or create new one if needed
+   - Added consistent logging of database file operations
+
+These changes follow the project architecture, which specifies that database files should be stored within the Git repository structure, not in the project root directory.
 
 ## Recent Fixes
 

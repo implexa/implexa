@@ -8,6 +8,7 @@
 - Move to Tauri 2.0 (not sure why we are on Tauri 1.5?)
 - Do we need to split some of the file into smaller ones?
 - Remove all things that are for backwards compatibility
+- I think workspacees are not fully implimented yet?
 
 
 
@@ -19,3 +20,4 @@
 - for code: when refactoring a file do all the changes in one edit where possible
 - Have different system prompts when switching between modes. There must be some overlap in what is sent, and there could be a shared context that gets sent at the beginning and is never sent again. We only need to send the new capabilities after a mode switch.
 - Add a git commit message to the task completion message
+- ALLOW ARCHITECT TO EDIT SVG FILES!!!

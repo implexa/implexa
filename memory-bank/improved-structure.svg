@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 560">
+  <!-- Background -->
+  <rect width="800" height="560" fill="#f8f9fa" rx="10" ry="10"/>
+  
+  <!-- Title -->
+  <text x="400" y="40" font-family="Arial" font-size="24" text-anchor="middle" font-weight="bold">Recommended Project Structure</text>
+  
+  <!-- Current Structure - Left Side -->
+  <rect x="50" y="80" width="300" height="380" rx="8" ry="8" fill="#ffebee" stroke="#b71c1c" stroke-width="2"/>
+  <text x="200" y="110" font-family="Arial" font-size="18" text-anchor="middle" font-weight="bold">Current Structure (Problematic)</text>
+  
+  <!-- Binary Crate Box - Current -->
+  <rect x="70" y="130" width="260" height="150" rx="5" ry="5" fill="#f5f5f5" stroke="#616161" stroke-width="1"/>
+  <text x="200" y="150" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Binary Crate (main.rs)</text>
+  <rect x="90" y="165" width="220" height="25" rx="3" ry="3" fill="#e0e0e0"/>
+  <text x="200" y="183" font-family="Arial" font-size="14" text-anchor="middle">mod commands;</text>
+  <rect x="90" y="195" width="220" height="25" rx="3" ry="3" fill="#e0e0e0"/>
+  <text x="200" y="213" font-family="Arial" font-size="14" text-anchor="middle">mod part_commands;</text>
+  <rect x="90" y="225" width="220" height="25" rx="3" ry="3" fill="#e0e0e0"/>
+  <text x="200" y="243" font-family="Arial" font-size="14" text-anchor="middle">mod workspace_commands;</text>
+  
+  <!-- Library Crate Box - Current -->
+  <rect x="70" y="290" width="260" height="150" rx="5" ry="5" fill="#f5f5f5" stroke="#616161" stroke-width="1"/>
+  <text x="200" y="310" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Library Crate (lib.rs)</text>
+  <rect x="90" y="325" width="220" height="25" rx="3" ry="3" fill="#e0e0e0"/>
+  <text x="200" y="343" font-family="Arial" font-size="14" text-anchor="middle">pub mod git_backend;</text>
+  <rect x="90" y="355" width="220" height="25" rx="3" ry="3" fill="#e0e0e0"/>
+  <text x="200" y="373" font-family="Arial" font-size="14" text-anchor="middle">pub mod database;</text>
+  <rect x="90" y="385" width="220" height="25" rx="3" ry="3" fill="#e0e0e0"/>
+  <text x="200" y="403" font-family="Arial" font-size="14" text-anchor="middle">pub mod commands;</text>
+  
+  <!-- Error indicator -->
+  <path d="M 200 250 L 200 290" stroke="#f44336" stroke-width="3" stroke-dasharray="5,5" fill="none"/>
+  <circle cx="200" y="270" r="15" fill="#ffcccb" stroke="#b71c1c" stroke-width="2"/>
+  <text x="200" y="275" font-family="Arial" font-size="20" text-anchor="middle" font-weight="bold" fill="#b71c1c">!</text>
+  <text x="225" y="275" font-family="Arial" font-size="14" text-anchor="left" fill="#b71c1c">Duplicate module</text>
+  
+  <!-- Improved Structure - Right Side -->
+  <rect x="450" y="80" width="300" height="460" rx="8" ry="8" fill="#e8f5e9" stroke="#1b5e20" stroke-width="2"/>
+  <text x="600" y="110" font-family="Arial" font-size="18" text-anchor="middle" font-weight="bold">Improved Structure</text>
+  
+  <!-- Binary Crate Box - Improved -->
+  <rect x="470" y="130" width="260" height="140" rx="5" ry="5" fill="#f5f5f5" stroke="#616161" stroke-width="1"/>
+  <text x="600" y="150" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Binary Crate (main.rs)</text>
+  <rect x="490" y="170" width="220" height="80" rx="3" ry="3" fill="#e3f2fd"/>
+  <text x="600" y="190" font-family="Arial" font-size="14" text-anchor="middle">use implexa::commands::*;</text>
+  <text x="600" y="220" font-family="Arial" font-size="14" text-anchor="middle">fn main() {</text>
+  <text x="600" y="240" font-family="Arial" font-size="14" text-anchor="middle">    implexa::run_app();</text>
+  
+  <!-- Library Crate Box - Improved -->
+  <rect x="470" y="280" width="260" height="240" rx="5" ry="5" fill="#f5f5f5" stroke="#616161" stroke-width="1"/>
+  <text x="600" y="300" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Library Crate (lib.rs)</text>
+  <rect x="490" y="320" width="220" height="25" rx="3" ry="3" fill="#e0e0e0"/>
+  <text x="600" y="338" font-family="Arial" font-size="14" text-anchor="middle">pub mod git_backend;</text>
+  <rect x="490" y="350" width="220" height="25" rx="3" ry="3" fill="#e0e0e0"/>
+  <text x="600" y="368" font-family="Arial" font-size="14" text-anchor="middle">pub mod database;</text>
+  <rect x="490" y="380" width="220" height="25" rx="3" ry="3" fill="#c8e6c9"/>
+  <text x="600" y="398" font-family="Arial" font-size="14" text-anchor="middle" fill="#1b5e20">pub mod commands;</text>
+  
+  <!-- Commands Module Structure -->
+  <rect x="510" y="415" width="180" height="95" rx="3" ry="3" fill="#c8e6c9" stroke="#1b5e20" stroke-width="1" stroke-dasharray="3,3"/>
+  <text x="600" y="430" font-family="Arial" font-size="12" text-anchor="middle">commands/mod.rs</text>
+  <line x1="510" y1="440" x2="690" y2="440" stroke="#1b5e20" stroke-width="1"/>
+  <text x="515" y="455" font-family="Arial" font-size="12" text-anchor="start">pub mod parts;</text>
+  <text x="515" y="475" font-family="Arial" font-size="12" text-anchor="start">pub mod workspace;</text>
+  <text x="515" y="495" font-family="Arial" font-size="12" text-anchor="start">pub mod repository;</text>
+  <text x="515" y="515" font-family="Arial" font-size="12" text-anchor="start">// Common utilities...</text>
+  
+  <!-- Arrow connecting current to improved -->
+  <path d="M 360 270 L 440 270" stroke="#424242" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  <text x="400" y="260" font-family="Arial" font-size="14" text-anchor="middle">Refactor</text>
+  
+  <!-- Footer Notes -->
+  <rect x="100" y="480" width="600" height="60" rx="5" ry="5" fill="#fffde7" stroke="#fbc02d" stroke-width="1"/>
+  <text x="400" y="505" font-family="Arial" font-size="14" text-anchor="middle" font-weight="bold">Best Practices</text>
+  <text x="400" y="525" font-family="Arial" font-size="12" text-anchor="middle">• Keep all command implementations in the library crate</text>
+  <text x="400" y="545" font-family="Arial" font-size="12" text-anchor="middle">• Group related commands into submodules for better organization</text>
+  
+  <!-- Arrowhead marker -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#424242" />
+    </marker>
+  </defs>
+</svg>

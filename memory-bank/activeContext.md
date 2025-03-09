@@ -1,6 +1,37 @@
 # Active Context
 
-## Current Task: March 6, 2025
+## Current Task: March 8, 2025
+Crate Structure Architecture Analysis and Refactoring Plan
+
+I've conducted a thorough review of the crate structure issue and developed a comprehensive refactoring plan to resolve the ongoing build failures. The current architecture with duplicate command modules in both binary and library crates is creating circular dependencies and import confusion.
+
+### Analysis Findings
+- The core issue is deeper than just import path fixes (previously attempted in DEC-020)
+- Having command modules in both binary and library crates creates ambiguity
+- The current approach results in build errors like `can't find crate for 'implexa'`
+- Simply changing `crate::` to `implexa::` doesn't resolve the underlying architectural issue
+
+### Solution Proposed
+- Move ALL command implementations to the library crate, organized in a logical module hierarchy
+- Have the binary crate only register commands with Tauri, not implement them
+- Create a proper command structure with a central mod.rs for re-exports
+- Enforce unidirectional dependencies from binary to library
+
+### Documentation Updated
+- Created `crate-structure-refactor.md` with detailed refactoring guidance
+- Created `crate-structure-architecture.md` with architecture diagrams and visualizations
+- Updated decision log with new decision DEC-022 for Crate Structure Refactoring
+- Marked previous DEC-020 as deprecated (superseded by new approach)
+- Updated memory bank index to include new documents
+
+### Benefits of New Architecture
+- Resolves circular dependencies and module name conflicts
+- Creates cleaner, more maintainable architecture
+- Strengthens dual crate structure benefits (separation of concerns, code reuse)
+- Follows Rust best practices for crate organization
+- Aligns with SOLID, KISS, YAGNI, and DRY principles
+
+## Previous Task: March 6, 2025
 Thread Safety Solution Implementation Complete
 
 I've successfully implemented the thread safety solution for SQLite Connection Management. The implementation follows the approach decided in DEC-021, using a single connection with a standard synchronous Mutex approach and SQLite's Write-Ahead Logging (WAL) mode.

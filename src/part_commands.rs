@@ -47,7 +47,7 @@ pub struct DatabaseState {
     /// Connection manager
     pub connection_manager: ConnectionManager,
     /// Part management manager
-    pub part_manager: Mutex<PartManagementManager>,
+    pub part_manager: Mutex<PartManagementManager<'static>>,
 }
 
 impl From<Part> for PartDto {
@@ -219,10 +219,12 @@ pub fn init_database_state() -> DatabaseState {
     use implexa::database::part_management::{User, UserRole};
     let system_user = User::new("system".to_string(), UserRole::Admin);
     
-    // Create the part manager
+    // Create the part manager with 'static lifetime
+    let static_connection_manager: &'static ConnectionManager = Box::leak(Box::new(connection_manager.clone()));
+    let static_git_manager: &'static GitBackendManager = Box::leak(Box::new(git_manager));
     let part_manager = PartManagementManager::new(
-        &connection_manager,
-        &git_manager,
+        static_connection_manager,
+        static_git_manager,
         system_user
     );
     

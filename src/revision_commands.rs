@@ -8,6 +8,8 @@ use tauri::{command, State};
 use serde::{Serialize, Deserialize};
 use implexa::database::revision::{RevisionManager, Revision, RevisionStatus};
 use implexa::database::connection_manager::ConnectionManager;
+use implexa::database::schema::DatabaseError;
+use rusqlite::params;
 
 /// Revision information for the frontend
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -99,7 +101,7 @@ pub async fn get_part_revisions(
     let revision_manager = revision_state.revision_manager.lock().map_err(|e| e.to_string())?;
     
     // Get all revisions for the part
-    let revisions = revision_manager.get_part_revisions(part_id)
+    let revisions = revision_manager.get_revisions_for_part(part_id)
         .map_err(|e| e.to_string())?;
     
     // Convert to DTOs
@@ -133,9 +135,39 @@ pub async fn get_latest_released_revision(
     revision_state: State<'_, RevisionState>,
 ) -> Result<RevisionDto, String> {
     let revision_manager = revision_state.revision_manager.lock().map_err(|e| e.to_string())?;
-    
-    // Get the latest released revision for the part
-    let revision = revision_manager.get_latest_released_revision(part_id)
+    // Get the latest released revision for the part by using a custom query
+    // since there's no direct method for this in the RevisionManager
+    let revision = revision_state.connection_manager.execute::<_, _, DatabaseError>(|conn| {
+        conn.query_row(
+            "SELECT revision_id, part_id, version, status, created_date, created_by, commit_hash
+             FROM Revisions
+             WHERE part_id = ?1 AND status = 'Released'
+             ORDER BY created_date DESC
+             LIMIT 1",
+            params![part_id],
+            |row| {
+                let status_str: String = row.get(3)?;
+                let status = RevisionStatus::from_str(&status_str)
+                    .unwrap_or(RevisionStatus::Draft);
+                
+                // Convert SQLite timestamp to SystemTime
+                let created_secs: i64 = row.get(4)?;
+                let created_date = std::time::SystemTime::UNIX_EPOCH +
+                    std::time::Duration::from_secs(created_secs as u64);
+
+                Ok(Revision {
+                    revision_id: Some(row.get(0)?),
+                    part_id: row.get(1)?,
+                    version: row.get(2)?,
+                    status,
+                    created_date,
+                    created_by: row.get(5)?,
+                    commit_hash: row.get(6)?,
+                })
+            },
+        )
+    })
+    .map_err(|e| e.to_string())?;
         .map_err(|e| e.to_string())?;
     
     // Convert to DTO
@@ -209,9 +241,16 @@ pub async fn update_revision(
     revision.created_by = revision_data.created_by;
     revision.commit_hash = revision_data.commit_hash;
     
-    // Save the updated revision
-    revision_manager.update_revision(&revision)
+    // We need to update the revision manually since there's no single update method
+    // Update status first
+    revision_manager.update_status(revision_id, revision.status)
         .map_err(|e| e.to_string())?;
+    
+    // Update commit hash if provided
+    if let Some(hash) = &revision.commit_hash {
+        revision_manager.update_commit_hash(revision_id, hash)
+            .map_err(|e| e.to_string())?;
+    }
     
     // Get the updated revision
     let updated_revision = revision_manager.get_revision(revision_id)
@@ -240,7 +279,7 @@ pub async fn update_revision_status(
     };
     
     // Update the revision status
-    revision_manager.update_revision_status(revision_id, status_enum)
+    revision_manager.update_status(revision_id, status_enum)
         .map_err(|e| e.to_string())?;
     
     // Get the updated revision
@@ -259,9 +298,15 @@ pub async fn delete_revision(
 ) -> Result<(), String> {
     let revision_manager = revision_state.revision_manager.lock().map_err(|e| e.to_string())?;
     
-    // Delete the revision
-    revision_manager.delete_revision(revision_id)
-        .map_err(|e| e.to_string())?;
+    // There's no direct delete_revision method, so we need to implement a custom solution
+    // Using a transaction to execute a DELETE statement
+    revision_state.connection_manager.execute_mut::<_, _, DatabaseError>(|conn| {
+        conn.execute(
+            "DELETE FROM Revisions WHERE revision_id = ?1",
+            params![revision_id],
+        )?;
+        Ok::<(), DatabaseError>(())
+    }).map_err(|e| e.to_string())?;
     
     Ok(())
 }

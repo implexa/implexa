@@ -57,12 +57,12 @@ impl From<Relationship> for RelationshipDto {
     fn from(relationship: Relationship) -> Self {
         Self {
             relationship_id: relationship.relationship_id.unwrap_or_default(),
-            parent_id: relationship.parent_id,
-            child_id: relationship.child_id,
-            relationship_type: relationship.relationship_type.to_str().to_string(),
+            parent_id: relationship.parent_part_id,
+            child_id: relationship.child_part_id,
+            relationship_type: relationship.relationship_type.to_str(),
             quantity: relationship.quantity,
-            unit: relationship.unit,
-            description: relationship.description,
+            unit: None, // Not in Relationship struct but needed for DTO
+            description: None, // Not in Relationship struct but needed for DTO
         }
     }
 }
@@ -104,7 +104,7 @@ pub async fn get_parent_relationships(
     let relationship_manager = relationship_state.relationship_manager.lock().map_err(|e| e.to_string())?;
     
     // Get all parent relationships for the part
-    let relationships = relationship_manager.get_parent_relationships(child_id)
+    let relationships = relationship_manager.get_parent_relationships(&child_id.to_string())
         .map_err(|e| e.to_string())?;
     
     // Convert to DTOs
@@ -124,7 +124,7 @@ pub async fn get_child_relationships(
     let relationship_manager = relationship_state.relationship_manager.lock().map_err(|e| e.to_string())?;
     
     // Get all child relationships for the part
-    let relationships = relationship_manager.get_child_relationships(parent_id)
+    let relationships = relationship_manager.get_child_relationships(&parent_id.to_string())
         .map_err(|e| e.to_string())?;
     
     // Convert to DTOs
@@ -156,9 +156,7 @@ pub async fn create_relationship(
         relationship_data.parent_id,
         relationship_data.child_id,
         relationship_type,
-        relationship_data.quantity,
-        relationship_data.unit,
-        relationship_data.description,
+        relationship_data.quantity
     );
     
     // Save the relationship
@@ -195,9 +193,7 @@ pub async fn update_relationship(
         relationship_data.parent_id,
         relationship_data.child_id,
         relationship_type,
-        relationship_data.quantity,
-        relationship_data.unit,
-        relationship_data.description,
+        relationship_data.quantity
     );
     relationship.relationship_id = Some(relationship_id);
     

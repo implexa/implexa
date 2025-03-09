@@ -463,7 +463,7 @@ This document tracks key architectural decisions made during the development of 
 
 ### DEC-020 - Dual Crate Structure Import Paths
 - **Date:** 2025-03-06
-- **Status:** Implemented
+- **Status:** Deprecated (superseded by DEC-022)
 - **Context:** The Implexa project has a dual crate structure with a library crate (`lib.rs`) exporting core functionality and a binary crate (`main.rs`) implementing the Tauri application. Command files in the binary crate were incorrectly accessing functionality from the library crate using `crate::` imports instead of `implexa::` imports.
 - **Decision:** Fix all import paths in command files by changing `crate::` imports to `implexa::` imports to properly reflect the architectural relationship between the binary crate and the library crate.
 - **Alternatives:**
@@ -501,6 +501,27 @@ This document tracks key architectural decisions made during the development of 
   - **Negative:** Potential for blocking UI if operations take a long time
 - **References:** thread-safety-issues.md, sqlite-thread-safety-approaches.md, connection-pool-implementation-guide.md, src/database/connection_manager.rs
 
+### DEC-022 - Crate Structure Refactoring
+- **Date:** 2025-03-08
+- **Status:** Proposed
+- **Context:** Despite implementing the DEC-020 fix for import paths, the Implexa project still faces issues with its dual crate structure. The build is failing with errors like `can't find crate for 'implexa'`, indicating a more fundamental architectural issue beyond import paths. The root cause is having duplicate command modules in both the library crate (`lib.rs`) and binary crate (`main.rs`), creating circular dependencies and import confusion.
+- **Decision:** Refactor the project structure to move ALL command implementations to the library crate, organizing them in a clean module hierarchy, while having the binary crate only register these commands with Tauri.
+- **Alternatives:**
+  - **Continue with import path fixes only (DEC-020 approach):** Would be simpler to implement but doesn't solve the underlying architectural issue.
+  - **Merge into a single crate:** Would eliminate the dual crate complexity but lose the benefits of separation of concerns and code reuse.
+  - **Move binary crate functionality to library:** Would solve the circular reference but blur the distinction between application and library code.
+  - **Use re-exports in the binary crate:** Would mask the issue without solving the underlying architectural problem.
+- **Consequences:**
+  - **Positive:** Eliminates circular dependencies and module name conflicts
+  - **Positive:** Creates a cleaner, more maintainable architecture with clear responsibility boundaries
+  - **Positive:** Strengthens the benefits of the dual crate structure (separation of concerns, code reuse, better testing, clear interfaces)
+  - **Positive:** Follows Rust best practices for crate organization
+  - **Positive:** Aligns with SOLID, KISS, YAGNI, and DRY principles
+  - **Negative:** Requires significant refactoring of existing code
+  - **Negative:** Will need to update import paths throughout the codebase
+  - **Negative:** May impact tests that rely on the current structure
+- **References:** crate-structure-refactor.md, dual-crate-structure-fix.md (now deprecated), src/commands.rs, src/main.rs, src/lib.rs
+
 ## Related Files
 - [Product Context](./productContext.md) - Project overview and high-level design
 - [Active Context](./activeContext.md) - Current session focus and recent activities
@@ -516,6 +537,7 @@ This document tracks key architectural decisions made during the development of 
 - [Dual Crate Structure Fix Guide](./dual-crate-structure-fix.md) - Guide for fixing import paths
 - [Thread Safety Issues](./thread-safety-issues.md) - Analysis of thread safety issues in SQLite connection management
 - [SQLite Thread Safety Approaches](./sqlite-thread-safety-approaches.md) - Comparison of approaches for SQLite thread safety
+- [Crate Structure Refactor](./crate-structure-refactor.md) - Guide for refactoring the crate structure
 
 ## Decision Index by Component
 
@@ -551,7 +573,8 @@ This document tracks key architectural decisions made during the development of 
 - [DEC-010](./decisionLog.md#dec-010---rust-module-organization-pattern) - Rust Module Organization Pattern
 - [DEC-015](./decisionLog.md#dec-015---directory-structure-implementation-approach) - Directory Structure Implementation Approach
 - [DEC-017](./decisionLog.md#dec-017---tauri-desktop-application-implementation) - Tauri Desktop Application Implementation
-- [DEC-020](./decisionLog.md#dec-020---dual-crate-structure-import-paths) - Dual Crate Structure Import Paths
+- [DEC-020](./decisionLog.md#dec-020---dual-crate-structure-import-paths) - Dual Crate Structure Import Paths (Deprecated)
+- [DEC-022](./decisionLog.md#dec-022---crate-structure-refactoring) - Crate Structure Refactoring
 
 ### Development Practices
 - [DEC-012](./decisionLog.md#dec-012---unit-testing-approach) - Unit Testing Approach

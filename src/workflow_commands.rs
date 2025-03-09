@@ -19,7 +19,7 @@ pub struct WorkflowDto {
     pub name: String,
     /// Description of the workflow
     pub description: Option<String>,
-    /// Whether this workflow is the default for parts
+    /// Whether this workflow is the default for parts (not in database model, for UI only)
     pub is_default: bool,
     /// Whether this workflow is active
     pub is_active: bool,
@@ -120,8 +120,8 @@ impl From<Workflow> for WorkflowDto {
             workflow_id: workflow.workflow_id.unwrap_or_default(),
             name: workflow.name,
             description: workflow.description,
-            is_default: workflow.is_default,
-            is_active: workflow.is_active,
+            is_default: false, // Not in Workflow struct, default to false
+            is_active: workflow.active,
         }
     }
 }
@@ -248,8 +248,7 @@ pub async fn create_workflow(
         workflow_id: None,
         name: workflow_data.name,
         description: workflow_data.description,
-        is_default: workflow_data.is_default,
-        is_active: workflow_data.is_active,
+        active: workflow_data.is_active,
     };
     
     // Save the workflow
@@ -278,8 +277,7 @@ pub async fn update_workflow(
         workflow_id: Some(workflow_id),
         name: workflow_data.name,
         description: workflow_data.description,
-        is_default: workflow_data.is_default,
-        is_active: workflow_data.is_active,
+        active: workflow_data.is_active,
     };
     
     // Update the workflow

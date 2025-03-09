@@ -23,7 +23,9 @@ This index provides a categorized list of all documentation in the memory bank f
 - [Coding Standards](./coding-standards.md) - Code style and practices
 - [Rust Module Refactoring Guide](./rust-module-refactoring-guide.md) - Guide for module organization
 - [Unit Testing Approach](./unit-testing-approach.md) - Testing philosophy and practices
-- [Dual Crate Structure Fix Guide](./dual-crate-structure-fix.md) - Guide for fixing import paths in the dual crate structure
+- [Dual Crate Structure Fix Guide](./dual-crate-structure-fix.md) - Guide for fixing import paths in the dual crate structure (deprecated)
+- [Crate Structure Refactor Guide](./crate-structure-refactor.md) - Guide for refactoring the crate structure architecture
+- [Crate Structure Architecture](./crate-structure-architecture.md) - Architectural diagrams and visualization of crate structure
 
 ## Project Requirements
 - [Implexa Project Requirement Doc](./implexa-project-requirement-doc.md) - Detailed project requirements
@@ -50,7 +52,7 @@ When starting a new context, AI assistants should prioritize reading:
 - **Working on Part Management**: Read [Part Management Workflow](./part-management-workflow.md)
 - **Working on UI**: Read [User Interface Architecture](./user-interface-architecture.md)
 - **Setting up Directory Structure**: Read [Directory Structure](./directory-structure.md)
-- **Fixing Crate Structure Issues**: Read [Dual Crate Structure Fix Guide](./dual-crate-structure-fix.md)
+- **Fixing Crate Structure Issues**: Read [Crate Structure Refactor Guide](./crate-structure-refactor.md) and [Crate Structure Architecture](./crate-structure-architecture.md)
 
 ## Memory Bank Structure
 

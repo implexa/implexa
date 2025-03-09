@@ -503,7 +503,7 @@ This document tracks key architectural decisions made during the development of 
 
 ### DEC-022 - Crate Structure Refactoring
 - **Date:** 2025-03-08
-- **Status:** Proposed
+- **Status:** Implemented
 - **Context:** Despite implementing the DEC-020 fix for import paths, the Implexa project still faces issues with its dual crate structure. The build is failing with errors like `can't find crate for 'implexa'`, indicating a more fundamental architectural issue beyond import paths. The root cause is having duplicate command modules in both the library crate (`lib.rs`) and binary crate (`main.rs`), creating circular dependencies and import confusion.
 - **Decision:** Refactor the project structure to move ALL command implementations to the library crate, organizing them in a clean module hierarchy, while having the binary crate only register these commands with Tauri.
 - **Alternatives:**

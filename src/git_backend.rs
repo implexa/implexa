@@ -416,7 +416,7 @@ impl GitBackendManager {
     /// Gets metadata for the specified commit
     pub fn get_commit_metadata(
         &self,
-        repo: &Repository,
+        _repo: &Repository,
         commit: &Commit,
     ) -> Result<Metadata> {
         // Get the commit message
@@ -512,6 +512,7 @@ impl GitBackendManager {
     }
     
     /// Logs an operation for debugging and audit purposes
+    #[allow(dead_code)]
     fn log_operation(&self, operation: &str, details: &str) {
         log::info!("Git operation: {} - {}", operation, details);
     }

@@ -9,6 +9,8 @@
 - Do we need to split some of the file into smaller ones?
 - Remove all things that are for backwards compatibility
 - I think workspacees are not fully implimented yet?
+- need to figure out how it works with files. 
+- It added a bunch of allow_deadcode tags to dead code, should we just delete it?
 
 
 

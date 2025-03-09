@@ -1,7 +1,8 @@
-//! Tauri command handlers
+//! Repository command handlers
 //!
-//! This module contains the command handlers for the Tauri application.
+//! This module contains the command handlers for Git repository operations.
 //! These commands are exposed to the frontend and allow it to interact with the backend.
+
 use std::path::Path;
 use std::sync::Mutex;
 use tauri::{command, State};
@@ -72,7 +73,7 @@ pub async fn create_repository(
     repo_manager.setup_plm_structure().map_err(|e| e.to_string())?;
     
     // Create a part directory with the specified template
-    let template_type = match template_type.as_str() {
+    let _template_type = match template_type.as_str() {
         "minimal" => TemplateType::Minimal,
         "extended" => TemplateType::Extended,
         _ => TemplateType::Standard,
@@ -107,7 +108,7 @@ pub async fn open_repository(
 /// Close a repository
 #[command]
 pub async fn close_repository(
-    path: String,
+    _path: String,
     _git_state: State<'_, GitBackendState>,
 ) -> Result<(), String> {
     // Nothing to do here, as the repository is closed automatically when it goes out of scope

@@ -25,16 +25,7 @@ pub use git_backend::{
     UiCommitResult,
     Metadata,
 };
-
-/// Re-export the commands for easier access
-pub use commands::{
-    create_repository,
-    open_repository,
-    close_repository,
-    get_repository_info,
-    GitBackendState,
-    init_git_backend,
-};
+// No need for a separate re-export of commands since we're already exporting the module
 
 /// Re-export the Database types and managers for easier access
 pub use database::{
@@ -103,7 +94,7 @@ pub fn init_logging() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::Path;
+    // Path is used when calling temp_dir.path() but we can explicitly cast it
     use tempfile::tempdir;
 
     #[test]

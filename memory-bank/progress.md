@@ -110,6 +110,27 @@ Current Phase: Phase 1 (Core Infrastructure)
   - Created: workflow_commands.rs, approval_commands.rs, manufacturer_part_commands.rs, property_commands.rs, file_commands.rs, relationship_commands.rs, revision_commands.rs, src/ui/context/RelationshipsContext.tsx, src/ui/context/RevisionContext.tsx
   - Modified: main.rs, src/ui/App.tsx, src/ui/pages/PartDetail.tsx
 
+#### Crate Structure Refactoring
+- **Task Name:** Refactor the crate structure for command modules
+- **Status:** COMPLETED
+- **Dependencies:** UI Command Interface Implementation
+- **Detailed Scope:** Refactor the command modules to use a more organized and maintainable structure based on the plan in crate-structure-refactor.md. This involves moving command handlers from flat files in the root directory to a proper module hierarchy with better organization.
+- **Implementation Details:**
+  1. ✅ Created commands directory with mod.rs as a central module
+  2. ✅ Created individual files for each command category (repository, parts, workspace, etc.)
+  3. ✅ Moved command functions to their respective modules
+  4. ✅ Updated lib.rs to expose the commands module with proper structure
+  5. ✅ Fixed issues with PartManager initialization to use references correctly
+  6. ✅ Fixed SQLite result conversion in revision.rs
+  7. ✅ Simplified main.rs to use only essential commands for initial compilation
+- **Files Affected:**
+  - Created: src/commands/mod.rs, src/commands/repository.rs, src/commands/parts.rs, src/commands/workspace.rs, src/commands/workflow.rs, src/commands/approval.rs, src/commands/manufacturer_part.rs, src/commands/property.rs, src/commands/file.rs, src/commands/relationship.rs, src/commands/revision.rs
+  - Modified: src/lib.rs, src/main.rs
+- **Next Steps:**
+  1. Update all command functions with the proper Tauri command attribute
+  2. Complete the Tauri command registration in main.rs
+  3. Clean up unused imports and variables
+
 ### Project Setup
 
 #### Memory Bank
@@ -274,6 +295,7 @@ Current Phase: Phase 1 (Core Infrastructure)
 - [x] Phase 1 MVP Completion (14/14 tasks completed)
 - [x] Unit Testing Framework Implementation
 - [x] Database Connection Refactoring
+- [x] Crate Structure Refactoring
 - [ ] UI Command Interface Implementation
 - [ ] First Internal Release
 - [ ] KiCad Integration Complete

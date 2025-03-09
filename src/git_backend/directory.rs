@@ -77,6 +77,7 @@ impl std::fmt::Display for TemplateType {
 /// Directory Template Manager
 pub struct DirectoryTemplateManager<'a> {
     /// The Git Backend configuration
+    #[allow(dead_code)]
     config: &'a GitBackendConfig,
     /// Repository path
     repo_path: PathBuf,
@@ -573,6 +574,7 @@ impl<'a> DirectoryTemplateManager<'a> {
     }
 
     /// Validates if a category code is valid
+    #[allow(dead_code)]
     fn is_valid_category(&self, category: &str) -> bool {
         // Simple validation: non-empty string with 2-3 uppercase letters
         !category.is_empty() && category.len() <= 3 &&
@@ -580,6 +582,7 @@ impl<'a> DirectoryTemplateManager<'a> {
     }
 
     /// Validates if a subcategory code is valid
+    #[allow(dead_code)]
     fn is_valid_subcategory(&self, subcategory: &str) -> bool {
         // Simple validation: non-empty string with 2-4 uppercase letters
         !subcategory.is_empty() && subcategory.len() <= 4 &&

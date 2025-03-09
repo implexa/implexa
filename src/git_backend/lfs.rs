@@ -73,7 +73,7 @@ impl<'a> LfsManager<'a> {
     /// Gets the status of LFS objects in the repository
     pub fn get_lfs_status(&self) -> Result<LfsStatus> {
         // Get the repository path
-        let repo_path = self.repo.path().parent()
+        let _repo_path = self.repo.path().parent()
             .ok_or_else(|| GitBackendError::RepositoryError("Repository path has no parent".to_string()))?;
         
         // Check if LFS is enabled

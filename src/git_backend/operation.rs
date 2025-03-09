@@ -13,6 +13,7 @@ pub struct OperationHandler<'a> {
     /// The Git repository
     repo: &'a Repository,
     /// The Git Backend configuration
+    #[allow(dead_code)]
     config: &'a GitBackendConfig,
 }
 

@@ -2,7 +2,6 @@
 //!
 //! This module provides functionality for managing parts throughout their lifecycle,
 //! including creation, status transitions, and workflow enforcement.
-
 use crate::database::schema::DatabaseError;
 use crate::database::part::{Part, PartManager};
 use crate::database::revision::{Revision, RevisionStatus, RevisionManager};
@@ -285,7 +284,7 @@ impl<'a> PartManagementManager<'a> {
             let display_part_number = part.display_part_number_in_transaction(tx);
             
             // Create a review branch
-            let feature_branch = format!("part/{}/draft", display_part_number);
+            let _feature_branch = format!("part/{}/draft", display_part_number);
             let review_branch = format!("part/{}/review", display_part_number);
             
             // Create and checkout the review branch
@@ -708,7 +707,7 @@ impl<'a> PartManagementManager<'a> {
         &self,
         part_id: i64,
     ) -> PartManagementResult<Vec<(Revision, Vec<Approval>)>> {
-        self.connection_manager.execute::<_, _, PartManagementError>(|conn| {
+        self.connection_manager.execute::<_, _, PartManagementError>(|_conn| {
             // Create managers
             let revision_manager = RevisionManager::new(self.connection_manager);
             let approval_manager = ApprovalManager::new(self.connection_manager);
@@ -733,6 +732,7 @@ mod tests {
     use super::*;
     use crate::database::schema::DatabaseManager;
     use crate::git_backend::{GitBackendConfig, AuthConfig};
+    use crate::database::workflow::WorkflowManager;
     use tempfile::tempdir;
     
     #[test]
@@ -769,7 +769,7 @@ mod tests {
             index.write_tree().unwrap()
         };
         let tree = repo.find_tree(tree_id).unwrap();
-        let commit_id = repo.commit(Some("refs/heads/main"), &sig, &sig, "Initial commit", &tree, &[]).unwrap();
+        let _commit_id = repo.commit(Some("refs/heads/main"), &sig, &sig, "Initial commit", &tree, &[]).unwrap();
         
         // Explicitly set HEAD to point to the main branch
         repo.set_head("refs/heads/main").unwrap();

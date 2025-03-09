@@ -16,6 +16,7 @@ pub struct HookManager<'a> {
     /// The Git repository
     repo: &'a Repository,
     /// The Git Backend configuration
+    #[allow(dead_code)]
     config: &'a GitBackendConfig,
 }
 
@@ -149,7 +150,7 @@ impl<'a> HookManager<'a> {
     /// Converts a workflow to a script
     fn workflow_to_script(&self, workflow: &Workflow) -> Result<String> {
         // Get the repository path
-        let repo_path = self.repo.path().parent()
+        let _repo_path = self.repo.path().parent()
             .ok_or_else(|| GitBackendError::RepositoryError("Repository path has no parent".to_string()))?;
         
         // Build the script

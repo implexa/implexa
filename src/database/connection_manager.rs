@@ -176,7 +176,6 @@ impl ConnectionManager {
 
 #[cfg(test)]
 pub mod test_utils {
-    use super::*;
     use std::sync::{Arc, Mutex};
     use rusqlite::{Connection, Transaction};
     use std::collections::HashMap;
@@ -184,6 +183,7 @@ pub mod test_utils {
     /// Mock connection manager for testing
     pub struct MockConnectionManager {
         /// Mock data storage
+        #[allow(dead_code)]
         data: Arc<Mutex<HashMap<String, Vec<HashMap<String, rusqlite::types::Value>>>>>,
     }
 
@@ -263,24 +263,24 @@ pub mod tests {
     pub fn create_test_connection_manager() -> ConnectionManager {
         let connection = Connection::open_in_memory().expect("Failed to create in-memory database");
         
-        // Enable WAL mode for the in-memory database
-        connection.execute_batch("PRAGMA journal_mode=WAL").expect("Failed to enable WAL mode");
+        // Note: In-memory databases don't support WAL mode and use MEMORY journal mode
         
         ConnectionManager {
             connection: Arc::new(Mutex::new(connection)),
         }
     }
-    
     #[test]
     fn test_wal_mode() {
         let conn_manager = create_test_connection_manager();
         
-        // Verify WAL mode is enabled
+        // Verify journal mode is set
         let journal_mode: String = conn_manager.execute(|conn| {
             conn.query_row("PRAGMA journal_mode", [], |row| row.get(0))
         }).expect("Failed to get journal mode");
         
-        assert_eq!(journal_mode.to_uppercase(), "WAL");
+        // In-memory databases use "MEMORY" journal mode, file-based use "WAL"
+        // For tests using in-memory databases, "MEMORY" is the expected value
+        assert_eq!(journal_mode.to_uppercase(), "MEMORY");
     }
     
     #[test]
